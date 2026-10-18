@@ -40,7 +40,13 @@ private final class ArtworkTransport: NSObject, URLSessionTaskDelegate, @uncheck
 actor ArtworkCache {
   static let shared = ArtworkCache()
   private let transport = ArtworkTransport()
+  private let providedNetwork: URLSession?
+  private let providedRoot: URL?
+  init(network: URLSession? = nil, root: URL? = nil) {
+    providedNetwork = network; providedRoot = root
+  }
   private lazy var network: URLSession = {
+    if let providedNetwork { return providedNetwork }
     let config = URLSessionConfiguration.ephemeral
     config.urlCache = nil
     config.timeoutIntervalForRequest = 12
@@ -52,14 +58,22 @@ actor ArtworkCache {
     guard let token = api.token, !token.isEmpty else { return nil }
     let manager = FileManager.default
     guard let caches = manager.urls(for: .cachesDirectory, in: .userDomainMask).first else { return nil }
-    let root = caches.appendingPathComponent("question-artwork", isDirectory: true)
+    let root = providedRoot ?? caches.appendingPathComponent("question-artwork", isDirectory: true)
     let scope = ArtworkImage.hash(Data((api.base.absoluteString + "|" + account).utf8))
     let folder = root.appendingPathComponent(scope, isDirectory: true)
     try? manager.createDirectory(at: folder, withIntermediateDirectories: true)
     let manifestFile = folder.appendingPathComponent(ArtworkImage.hash(Data(assignment.utf8)) + ".json")
     var manifest: AssignmentArtwork?
     do {
-      let received: AssignmentArtwork = try await api.get("/assignments/" + assignment + "/artwork")
+      guard let manifestURL = URL(string: "/assignments/" + assignment + "/artwork", relativeTo: api.base)?.absoluteURL,
+        manifestURL.host == api.base.host, manifestURL.scheme == api.base.scheme else { return nil }
+      var manifestRequest = URLRequest(url: manifestURL)
+      manifestRequest.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
+      let (manifestData, manifestResponse) = try await network.data(for: manifestRequest)
+      guard let response = manifestResponse as? HTTPURLResponse else { return nil }
+      if [401, 403, 404].contains(response.statusCode) { return nil }
+      guard response.statusCode == 200, manifestData.count <= 32768 else { throw URLError(.badServerResponse) }
+      let received = try JSONDecoder().decode(AssignmentArtwork.self, from: manifestData)
       guard received.images.allSatisfy({ $0.valid(for: assignment) }) else { return nil }
       manifest = received
       // Preserve a previously downloaded manifest through an offline/server outage.
