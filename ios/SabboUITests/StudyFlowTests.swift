@@ -100,6 +100,9 @@ final class BonusFlowTests: XCTestCase {
     XCTAssertFalse(app.buttons["start-bonus"].exists)
     app.buttons["avatar-picker"].tap()
     XCTAssertTrue(app.navigationBars["Mitt tilbehør"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.staticTexts["tomorrow-outfit"].exists)
+    let wardrobe = XCTAttachment(screenshot: app.screenshot())
+    wardrobe.name = "Tomorrow outfit wardrobe"; wardrobe.lifetime = .keepAlways; add(wardrobe)
     XCTAssertTrue(app.buttons["Blå caps"].isEnabled)
     XCTAssertFalse(app.buttons["Låst tilbehør"].isEnabled)
   }

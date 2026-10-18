@@ -87,6 +87,8 @@ struct CosmeticPicker: View {
       ScrollView {
         VStack(spacing: 22) {
           PlayerAvatar(userID: model.session?.user_id, size: 132)
+          Text("Morgendagens antrekk").font(.headline)
+            .accessibilityIdentifier("tomorrow-outfit")
           Text("\(model.local.cosmetics?.owned.count ?? 0) av \(model.local.cosmetics?.items.count ?? 100) samlet")
             .font(.subheadline).foregroundStyle(.secondary)
           Button("Uten tilbehør") { equip(nil) }.buttonStyle(.bordered).disabled(saving || selected == nil)
@@ -100,7 +102,7 @@ struct CosmeticPicker: View {
                       .clipShape(RoundedRectangle(cornerRadius: 18))
                   } else { CosmeticItemImage(id: item.id, locked: true, size: 80).frame(height: 100) }
                   HStack(spacing: 4) {
-                    if selected == item.id { Image(systemName: "checkmark.circle.fill") }
+                    if selected == item.id { Image(systemName: "checkmark.circle.fill").accessibilityLabel("Morgendagens antrekk") }
                     if unlocked { Text(item.name).lineLimit(1).minimumScaleFactor(0.8) }
                     else { Image(systemName: "lock.fill") }
                   }.font(.caption.weight(.semibold))
@@ -109,6 +111,7 @@ struct CosmeticPicker: View {
                   .background(selected == item.id ? SabboStyle.mint : Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
               }.buttonStyle(.plain).disabled(!unlocked || saving)
                 .accessibilityLabel(unlocked ? item.name : "Låst tilbehør")
+                .accessibilityValue(selected == item.id ? "Morgendagens antrekk" : "")
             }
           }
         }.padding(22).frame(maxWidth: 620).frame(maxWidth: .infinity)

@@ -24,17 +24,35 @@ enum AnswerSet {
 }
 
 struct StudyVisual: View {
+  @EnvironmentObject var model: AppModel
+  @Environment(\.artworkAssignmentID) private var inheritedAssignment
+  @Environment(\.scenePhase) private var scenePhase
   let question: Question
   var maximumHeight: CGFloat = 200
+  var assignmentID: String? = nil
+  @State private var downloaded: UIImage?
+  private var assignment: String? { assignmentID ?? inheritedAssignment }
+  private var identity: String { (model.session?.user_id ?? "") + ":" + (assignment ?? "") + ":" + question.id }
   var body: some View {
-    // Art ships with the app: no network dependency or remote image cache.
-    // Future server questions without bundled art keep the writing flow usable.
-    if let artwork = UIImage(named: "Question-" + question.id) {
-      Image(uiImage: artwork).resizable().scaledToFit()
-        .frame(maxWidth: 360, maxHeight: maximumHeight)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
-        .frame(maxWidth: .infinity).accessibilityHidden(true)
+    Group {
+      if let artwork = downloaded ?? UIImage(named: "Question-" + question.id) {
+        Image(uiImage: artwork).resizable().scaledToFit()
+          .frame(maxWidth: 360, maxHeight: maximumHeight)
+          .clipShape(RoundedRectangle(cornerRadius: 18))
+          .frame(maxWidth: .infinity).accessibilityHidden(true)
+      }
     }
+    .task(id: identity) { downloaded = nil; await load() }
+    .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await load() } } }
+    .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
+      if scenePhase == .active && downloaded == nil { Task { await load() } }
+    }
+  }
+  private func load() async {
+    guard !model.testing, let assignment, let account = model.session?.user_id else { return }
+    let current = identity
+    if let data = await ArtworkCache.shared.image(api: model.api, account: account, assignment: assignment, question: question.id),
+      current == identity, !Task.isCancelled { downloaded = UIImage(data: data) }
   }
 }
 
@@ -121,6 +139,7 @@ struct ResultAnswersView: View {
     ForEach(Array((question.parts ?? [question]).enumerated()), id: \.element.id) { index, part in
       DisclosureGroup {
         VStack(alignment: .leading, spacing: 16) {
+          StudyVisual(question: part, maximumHeight: 150)
           QuestionPrompt(question: part).font(.subheadline).foregroundStyle(.secondary)
           if !(part.materials ?? []).isEmpty {
             DisclosureGroup("Oppgavemateriale") { QuestionMaterials(question: part, showExpectations: false) }
@@ -246,7 +265,7 @@ struct GoalSessionView: View {
               ProgressView(value: Double(index), total: Double(parts.count)).accessibilityLabel("Øktens fremdrift")
               DisclosureGroup("Dagens kompetansemål") { Text(day.question.prompt).font(.subheadline).padding(.top, 8) }
             }
-            StudyVisual(question: part)
+            StudyVisual(question: part, assignmentID: day.assignment.id)
             QuestionPrompt(question: part).font(.system(.title2, design: .rounded, weight: .bold)).fixedSize(horizontal: false, vertical: true)
             QuestionMaterials(question: part)
             Text("Ditt svar").font(.headline)

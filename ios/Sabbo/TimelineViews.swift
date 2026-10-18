@@ -104,6 +104,7 @@ struct DayResultsContent: View {
         Button("Oppdater") { Task { await load() } }
       }
     }
+    .environment(\.artworkAssignmentID, assignment.id)
     .task(id: assignment.id) { selectedPerson = initialPersonID ?? ownID; stage = initialStage; await load() }
     .onChange(of: selectedPerson) { old, _ in if !old.isEmpty { stage = "daily" } }
     .onChange(of: model.bonusStatus) { _, _ in Task { await load() } }
