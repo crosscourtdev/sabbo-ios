@@ -1,0 +1,15 @@
+{
+  "ownerID": "owner",
+  "learnerID": "learner",
+  "ownerName": "Coach",
+  "learnerName": "Learner",
+  "ownerAvatar": "AvatarOwner",
+  "learnerAvatar": "AvatarLearner",
+  "rewardAsset": "RewardAnimation",
+  "rewardAccessibilityLabel": "Celebration",
+  "rewardMessages": {
+    "5": "Fem dager med læring. Godt jobbet!",
+    "15": "Femten dager med læring. Fortsett slik!",
+    "50": "Femti dager med læring. Gratulerer!"
+  }
+}

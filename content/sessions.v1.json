@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "sessions": [
+    {
+      "id": "demo-goal-1",
+      "version": 1,
+      "subject_id": "pome",
+      "goal_ids": [
+        "demo"
+      ],
+      "prompt": "Undersøk en kilde.",
+      "title": "Øv på kildekritikk",
+      "example_answer": "Jeg undersøker avsenderen og sammenligner med en annen kilde.",
+      "key_points": [
+        "Avsender",
+        "Sammenligning"
+      ],
+      "guidance": "Forklar med egne ord.",
+      "parts": [
+        {
+          "id": "goal-1-demo-part-1",
+          "version": 1,
+          "subject_id": "pome",
+          "goal_ids": [
+            "demo"
+          ],
+          "prompt": "Hvorfor bør du sammenligne to kilder?",
+          "title": "Eksempel 1",
+          "example_answer": "Sammenlign opplysninger og undersøk avsenderen.",
+          "key_points": [
+            "Avsender",
+            "Sammenligning"
+          ],
+          "guidance": "Forklar med egne ord."
+        },
+        {
+          "id": "goal-1-demo-part-2",
+          "version": 1,
+          "subject_id": "pome",
+          "goal_ids": [
+            "demo"
+          ],
+          "prompt": "Hvordan kan du kontrollere hvem som skrev en tekst?",
+          "title": "Eksempel 2",
+          "example_answer": "Sammenlign opplysninger og undersøk avsenderen.",
+          "key_points": [
+            "Avsender",
+            "Sammenligning"
+          ],
+          "guidance": "Forklar med egne ord."
+        }
+      ]
+    }
+  ]
+}
