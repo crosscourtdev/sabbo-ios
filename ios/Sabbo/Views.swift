@@ -204,7 +204,7 @@ struct TodayView: View {
           }
           VStack(alignment: .leading, spacing: 20) {
             SubjectPill(id: t.question.subject_id)
-            StudyVisual(question: t.question.parts?.first ?? t.question, maximumHeight: 150)
+            StudyVisual(question: t.question.parts?.first ?? t.question, maximumHeight: 150, assignmentID: t.assignment.id)
             Text(t.question.title ?? "Dagens utfordring")
               .font(.system(.title, design: .rounded, weight: .bold))
             if !model.hasSubmitted {
@@ -260,7 +260,7 @@ struct QuestionView: View {
         if let t = model.local.today {
           SessionSteps(step: model.complete ? 2 : model.hasSubmitted ? 1 : 0)
           if model.complete { VictoryView(provisional: model.pending != nil) }
-          if !model.hasSubmitted { StudyVisual(question: t.question) }
+          if !model.hasSubmitted { StudyVisual(question: t.question, assignmentID: t.assignment.id) }
           QuestionPrompt(question: t.question).font(.system(.title2, design: .rounded, weight: .bold)).fixedSize(horizontal: false, vertical: true)
           QuestionMaterials(question: t.question)
           goalDisclosure(t.question)
