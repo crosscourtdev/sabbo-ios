@@ -106,6 +106,11 @@ final class BonusFlowTests: XCTestCase {
     XCTAssertTrue(app.staticTexts["Drip check"].exists)
     let rewards = XCTAttachment(screenshot: app.screenshot())
     rewards.name = "Star rewards and achievements"; rewards.lifetime = .keepAlways; add(rewards)
+    app.buttons["stars-reward-150"].tap()
+    XCTAssertTrue(app.staticTexts["reward-unlock-day"].waitForExistence(timeout: 5))
+    app.buttons["close-streak-reward"].tap()
+    XCTAssertTrue(app.navigationBars["Stjerner og prestasjoner"].waitForExistence(timeout: 5))
+
   }
   func testCountdownAndWardrobe() {
     let app = open("waiting")

@@ -60,6 +60,7 @@
         local.history = [HistoryItem(id: attempt.id, answer: answer, question: question, assignment_id: assignment.id, day: assignment.day, mode: "daily", assessment: "completed", assisted: 0, submitted_at: "2026-10-16T12:00:00Z", revisions: [], evaluations: [evaluations[attempt.id]!], receipt_status: attempt.receipt_status)]
         local.progress = PairProgress(people: [PersonProgress(streak: streak, stars: Stars(total: state == "late" ? 0 : 50, epoch: UUID().uuidString, awards: ["waiting", "late"].contains(state) ? [] : [StarAward(day: assignment.day, attempt_id: attempt.id, grade: 5, stars: 5)]), fire_attempt_id: state == "late" ? nil : attempt.id, achievements: [
           Achievement(id: "studious", title: "Studious", description: "Få karakter 6 på en dagsøkt.", target: 1, progress: 0, stars: 25, symbol: "graduationcap.fill", earned_at: nil, attempt_id: nil),
+          Achievement(id: "smarter_brother", title: "The smarter brother", description: "Få bedre karakter enn \(ClientProfile.ownerName) tre dager på rad.", target: 3, progress: 1, stars: 25, symbol: "bolt.shield.fill", earned_at: nil, attempt_id: nil),
           Achievement(id: "drip_check", title: "Drip check", description: "Bruk tre forskjellige antrekk i dagsoppgavenes illustrasjoner.", target: 3, progress: 2, stars: 25, symbol: "tshirt.fill", earned_at: nil, attempt_id: nil)
         ])])
       }

@@ -27,11 +27,15 @@ struct RewardTrack: View {
   let rewards: [StreakReward]
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
-      HStack(alignment: .firstTextBaseline, spacing: 8) {
-        Image(systemName: symbol).foregroundStyle(color)
-        Text("\(value)").font(.system(.title, design: .rounded, weight: .heavy)).contentTransition(.numericText())
-        Text(label).font(.system(.headline, design: .rounded))
-      }.accessibilityElement(children: .combine)
+      HStack {
+        Text("Rekken din").font(.system(.title3, design: .rounded, weight: .bold))
+        Spacer()
+        if let next = rewards.first(where: { $0.threshold > best }) {
+          Text("\(max(0, next.threshold - value)) dager til neste kiste").font(.caption).foregroundStyle(.secondary)
+        } else {
+          Text("Alle kistene er åpnet").font(.caption).foregroundStyle(.secondary)
+        }
+      }
       HStack(spacing: 8) {
         ForEach(Array(rewards.enumerated()), id: \.element.id) { index, reward in
           let previous = index == 0 ? 0 : rewards[index - 1].threshold
@@ -94,7 +98,7 @@ struct QuestGainsView: View {
   }
   @ViewBuilder private var badges: some View {
     if earnedFire {
-      GainBadge(symbol: "flame.fill", text: "\(model.ownStreak?.current ?? 0) dager på rad", detail: "", color: SabboStyle.orange, pulse: firePulse)
+      GainBadge(symbol: "flame.fill", text: "+1 dag i rekken", detail: "", color: SabboStyle.orange, pulse: firePulse)
     }
     if let award {
       GainBadge(symbol: "star.fill", text: "+\(award.stars) stjerner", detail: "", color: .yellow, pulse: starPulse)
