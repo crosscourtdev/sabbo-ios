@@ -53,12 +53,12 @@ struct RewardTrack: View {
                 StreakRewardView(presentation: presentation).onAppear { model.rewardShown(presentation) }
               } label: {
               VStack(spacing: 4) {
-                TreasureChest(unlocked: access == .earned, size: 48)
+                RewardIcon(reward: reward, unlocked: access == .earned, size: 48)
                 Text(reward.isStar ? "\(reward.threshold) ★" : "Dag \(reward.threshold)")
                   .font(.system(.caption, design: .rounded, weight: .bold))
               }.frame(maxWidth: .infinity).contentShape(Rectangle())
             }.buttonStyle(.plain)
-              .accessibilityLabel(reward.isStar ? "Stjernekiste, \(reward.threshold) stjerner" : "Skattekiste, dag \(reward.threshold)")
+              .accessibilityLabel(reward.isStar ? "Stjernegave, \(reward.threshold) stjerner" : "Skattekiste, dag \(reward.threshold)")
               .accessibilityValue(access == .earned ? "Låst opp" : access == .preview ? "Forhåndsvis belønningen" : reward.lockedMessage)
               .accessibilityIdentifier("\(reward.kind)-reward-\(reward.threshold)")
           }
@@ -298,7 +298,7 @@ struct ProgressResetView: View {
           Picker("Nullstill", selection: $track) {
             Text("Stjerner").tag("stars"); Text("Flammer").tag("fire"); Text("Begge").tag("both")
           }.pickerStyle(.segmented)
-          Text("Telleren og tilhørende kister starter på nytt. Svar og karakterer beholdes. Tidligere innleveringer gir ikke nye poeng etter nullstilling.")
+          Text("Telleren og tilhørende belønninger starter på nytt. Svar og karakterer beholdes. Tidligere innleveringer gir ikke nye poeng etter nullstilling.")
             .font(.footnote).foregroundStyle(.secondary)
         }
         Section {
@@ -318,7 +318,7 @@ struct ProgressResetView: View {
 }
 
 
-/// Earned chests are an invitation, never a chain of automatic sheets.
+/// Earned rewards are an invitation, never a chain of automatic sheets.
 struct SessionRewardsView: View {
   @EnvironmentObject var model: AppModel
   @State private var opened: RewardPresentation?
@@ -328,14 +328,14 @@ struct SessionRewardsView: View {
       ForEach(rewards) { reward in
         Button { opened = reward } label: {
           HStack(spacing: 14) {
-            TreasureChest(unlocked: true, size: 48)
+            RewardIcon(reward: reward.reward, unlocked: true, size: 48)
             VStack(alignment: .leading, spacing: 4) {
-              Text("Ny kiste!").font(.headline)
+              Text(reward.reward.isStar ? "Ny gave!" : "Ny kiste!").font(.headline)
               Text(reward.reward.unlockLabel).font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
             Text("Åpne").font(.subheadline.bold())
-          }.padding(14).background(SabboStyle.mint, in: RoundedRectangle(cornerRadius: 18))
+          }.padding(14).background(reward.reward.isStar ? Color.purple.opacity(0.12) : SabboStyle.mint, in: RoundedRectangle(cornerRadius: 18))
         }.buttonStyle(.plain)
       }
     }

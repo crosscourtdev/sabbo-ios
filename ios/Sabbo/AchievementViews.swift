@@ -23,7 +23,7 @@ struct HomeCounters: View {
   private func counter(_ id: String, value: Int, symbol: String, color: Color, label: String) -> some View {
     CounterChip(value: value, symbol: symbol, color: color, stars: id == "stars") { destination = id }
       .accessibilityLabel("\(value) \(label)")
-      .accessibilityHint(id == "stars" ? "Vis stjernekister og prestasjoner" : "Vis rekken og belønningene")
+      .accessibilityHint(id == "stars" ? "Vis stjernegaver og prestasjoner" : "Vis rekken og belønningene")
       .accessibilityIdentifier("home-counter-" + id)
   }
 }
@@ -120,7 +120,7 @@ struct RewardCollection: View {
           Label("\(model.ownProgress?.stars.total ?? 0) stjerner", systemImage: "star.fill")
             .font(.system(.largeTitle, design: .rounded, weight: .heavy))
           if let next = StreakReward.starMilestones.first(where: { $0.threshold > (model.ownProgress?.stars.total ?? 0) }) {
-            Text("\(next.threshold - (model.ownProgress?.stars.total ?? 0)) stjerner til neste kiste").foregroundStyle(.secondary)
+            Text("\(next.threshold - (model.ownProgress?.stars.total ?? 0)) stjerner til neste gave").foregroundStyle(.secondary)
           }
           HStack {
             ForEach(StreakReward.starMilestones) { reward in
@@ -129,11 +129,11 @@ struct RewardCollection: View {
                 StreakRewardView(presentation: presentation).onAppear { model.rewardShown(presentation) }
               } label: {
                 VStack(spacing: 8) {
-                  TreasureChest(unlocked: model.rewardValue(reward) >= reward.threshold, size: 56)
+                  RewardIcon(reward: reward, unlocked: model.rewardValue(reward) >= reward.threshold, size: 56)
                   Text("\(reward.threshold) ★").font(.headline).foregroundStyle(.primary)
                 }.frame(maxWidth: .infinity).padding(.vertical, 12)
               }.buttonStyle(.plain).accessibilityIdentifier("stars-reward-\(reward.threshold)")
-                .accessibilityLabel("Stjernekiste, \(reward.threshold) stjerner")
+                .accessibilityLabel("Stjernegave, \(reward.threshold) stjerner")
             }
           }
           Text("Prestasjoner").font(.system(.title2, design: .rounded, weight: .bold))
