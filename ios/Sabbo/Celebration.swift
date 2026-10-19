@@ -114,7 +114,15 @@ struct GradeHeadline: View {
       Spacer(minLength: 0)
     }
     .scaleEffect(pop ? 1.08 : 1, anchor: .leading)
-    .overlay { ConfettiBurst(trigger: confetti, intensity: GradeCelebration.confetti(grade)).frame(width: 440, height: 520) }
+    .overlay {
+      // Keep the overlay's bounds on the headline; overflowing confetti must
+      // never enlarge the grade's accessibility frame over adjacent controls.
+      GeometryReader { geometry in
+        ConfettiBurst(trigger: confetti, intensity: GradeCelebration.confetti(grade))
+          .frame(width: 440, height: 520)
+          .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
+      }.allowsHitTesting(false).accessibilityHidden(true)
+    }
     .accessibilityIdentifier("grade-headline")
     .task {
       guard celebrates, model.collectGain(key) else {
