@@ -6,6 +6,8 @@
       guard testing else { return }
       // Separate local account identifier: tests never overwrite a learner's cache.
       session = Session(token: "test-fixture-unusable-token", user_id: "uitest")
+      // Each launch replays one-time celebrations, so tests always exercise them.
+      UserDefaults.standard.removeObject(forKey: "sabbo.gains.uitest")
       let q = Question(
         id: "pome-km11643-1", version: 1, subject_id: "pome", goal_ids: ["KM11643"],
         prompt:

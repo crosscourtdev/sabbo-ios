@@ -7,6 +7,7 @@ enum SabboStyle {
   static let forest = Color(red: 0.09, green: 0.25, blue: 0.21)
   static let mint = Color(red: 0.86, green: 0.93, blue: 0.78)
   static let orange = Color(red: 0.91, green: 0.40, blue: 0.15)
+  static let gold = Color(red: 0.96, green: 0.69, blue: 0.18)
   static func subject(_ id: String) -> Color { id == "pome" ? Color("AccentColor") : .indigo }
   static func symbol(_ id: String) -> String { id == "pome" ? "building.columns.fill" : "sparkles" }
 }
@@ -23,6 +24,7 @@ struct PlayButton: ButtonStyle {
       .offset(y: configuration.isPressed ? 3 : 0)
       .opacity(enabled ? 1 : 0.45)
       .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: configuration.isPressed)
+      .onChange(of: configuration.isPressed) { _, pressed in if pressed && enabled { SabboFX.shared.haptic(.tap) } }
   }
 }
 struct PortraitMark: View {
@@ -118,15 +120,19 @@ struct EvaluationCard: View {
   @Environment(\.scenePhase) private var scenePhase
   @State private var retry = 0
   @State private var loadError: String?
+  @State private var waitedHere = false
+  /// Celebrate a grade that arrived on screen, or today's unseen result; never old history.
+  private var celebrates: Bool {
+    (waitedHere || attemptID == model.currentAttemptID || attemptID == model.local.bonus?.attempt_id)
+      && !model.gainCollected("grade:" + attemptID)
+  }
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       if let evaluation = model.savedEvaluation(attemptID) {
         if let result = evaluation.result {
           VStack(alignment: .leading, spacing: 18) {
             if let grade = result.grade {
-              Text("Karakter \(grade)").font(.system(.largeTitle, design: .rounded, weight: .heavy))
-                .foregroundStyle(Color("AccentColor"))
-                .accessibilityLabel("Veiledende karakter \(grade) av 6")
+              GradeHeadline(grade: grade, key: "grade:" + attemptID, celebrate: celebrates).id(attemptID + String(grade))
             }
             if model.answersLocked(attemptID: attemptID) || question.map({ model.answersLocked($0) }) == true { BonusAnswersHidden() } else {
             Text(result.reason).lineLimit(3)
@@ -161,14 +167,14 @@ struct EvaluationCard: View {
             }
           }
         } else if ["queued", "processing"].contains(evaluation.status) {
-          HStack { ProgressView(); Text("Mottatt · Vurderer …").font(.subheadline) }
+          GradingWait(text: "Mottatt · Vurderer …")
         } else if ["failed", "unavailable", "budget_limited"].contains(evaluation.status) {
           Label("Vurderingen er ikke tilgjengelig nå.", systemImage: "exclamationmark.circle").font(.subheadline)
         } else {
           Text("Ingen vurdering er tilgjengelig for dette forsøket.").font(.subheadline)
         }
       } else if loadError == nil {
-        HStack { ProgressView(); Text("Mottatt · Henter vurderingen …").font(.subheadline) }
+        GradingWait(text: "Mottatt · Henter vurderingen …")
       }
       if let loadError, model.savedEvaluation(attemptID)?.result == nil {
         Text(loadError).font(.subheadline)
@@ -178,6 +184,7 @@ struct EvaluationCard: View {
       .padding(20)
       .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22))
       .accessibilityIdentifier("result-evaluation")
+      .onAppear { if model.savedEvaluation(attemptID)?.result == nil { waitedHere = true } }
       .task(id: attemptID + String(retry)) {
         loadError = nil
         loadError = await model.watchEvaluation(attemptID)
@@ -192,11 +199,12 @@ struct RewardIcon: View {
   let reward: StreakReward
   var unlocked = false
   var size: CGFloat = 64
+  var lid: Double = 0
   var body: some View {
     if reward.isStar {
-      StarGiftBox(unlocked: unlocked, size: size)
+      StarGiftBox(unlocked: unlocked, size: size, lid: lid)
     } else {
-      TreasureChest(unlocked: unlocked, size: size)
+      TreasureChest(unlocked: unlocked, size: size, lid: lid)
     }
   }
 }
@@ -204,6 +212,7 @@ struct RewardIcon: View {
 struct StarGiftBox: View {
   var unlocked = false
   var size: CGFloat = 64
+  var lid: Double = 0
   private var box: Color { unlocked ? Color(red: 0.55, green: 0.32, blue: 0.85) : Color(red: 0.63, green: 0.58, blue: 0.71) }
   private var ribbon: Color { unlocked ? Color(red: 1, green: 0.77, blue: 0.35) : Color(red: 0.85, green: 0.81, blue: 0.92) }
   var body: some View {
@@ -216,16 +225,19 @@ struct StarGiftBox: View {
       RoundedRectangle(cornerRadius: size * 0.05)
         .fill(box).frame(width: size * 0.68, height: size * 0.57).offset(y: size * 0.12)
         .shadow(color: .black.opacity(0.12), radius: size * 0.02, y: size * 0.03)
-      RoundedRectangle(cornerRadius: size * 0.03)
-        .fill(box).frame(width: size * 0.8, height: size * 0.14).offset(y: -size * 0.15)
-      Rectangle().fill(ribbon).frame(width: size * 0.13, height: size * 0.63).offset(y: size * 0.09)
-      Ellipse().stroke(ribbon, lineWidth: size * 0.065)
-        .frame(width: size * 0.27, height: size * 0.15)
-        .rotationEffect(.degrees(30)).offset(x: -size * 0.12, y: -size * 0.3)
-      Ellipse().stroke(ribbon, lineWidth: size * 0.065)
-        .frame(width: size * 0.27, height: size * 0.15)
-        .rotationEffect(.degrees(-30)).offset(x: size * 0.12, y: -size * 0.3)
-      Circle().fill(ribbon).frame(width: size * 0.14, height: size * 0.14).offset(y: -size * 0.23)
+      Rectangle().fill(ribbon).frame(width: size * 0.13, height: size * 0.57).offset(y: size * 0.12)
+      ZStack {
+        RoundedRectangle(cornerRadius: size * 0.03)
+          .fill(box).frame(width: size * 0.8, height: size * 0.14).offset(y: -size * 0.15)
+        Rectangle().fill(ribbon).frame(width: size * 0.13, height: size * 0.14).offset(y: -size * 0.15)
+        Ellipse().stroke(ribbon, lineWidth: size * 0.065)
+          .frame(width: size * 0.27, height: size * 0.15)
+          .rotationEffect(.degrees(30)).offset(x: -size * 0.12, y: -size * 0.3)
+        Ellipse().stroke(ribbon, lineWidth: size * 0.065)
+          .frame(width: size * 0.27, height: size * 0.15)
+          .rotationEffect(.degrees(-30)).offset(x: size * 0.12, y: -size * 0.3)
+        Circle().fill(ribbon).frame(width: size * 0.14, height: size * 0.14).offset(y: -size * 0.23)
+      }.rotationEffect(.degrees(-12 * lid)).offset(y: -size * 0.24 * CGFloat(lid))
       Circle().fill(ribbon).frame(width: size * 0.25, height: size * 0.25).offset(y: size * 0.12)
       Image(systemName: unlocked ? "star.fill" : "lock.fill")
         .font(.system(size: size * 0.12, weight: .heavy)).foregroundStyle(box)
@@ -237,7 +249,9 @@ struct StarGiftBox: View {
 struct TreasureChest: View {
   var unlocked = false
   var size: CGFloat = 64
-  private var gold: Color { unlocked ? Color(red: 0.96, green: 0.69, blue: 0.18) : Color(.systemGray3) }
+  /// 0 is closed; 1 lifts and tilts the lid over a glow.
+  var lid: Double = 0
+  private var gold: Color { unlocked ? SabboStyle.gold : Color(.systemGray3) }
   var body: some View {
     ZStack {
       if unlocked {
@@ -245,11 +259,17 @@ struct TreasureChest: View {
         Image(systemName: "sparkles").font(.system(size: size * 0.22, weight: .bold))
           .foregroundStyle(gold).offset(x: size * 0.32, y: -size * 0.32)
       }
+      if lid > 0 {
+        Ellipse().fill(Color(red: 1, green: 0.9, blue: 0.55)).frame(width: size * 0.7, height: size * 0.16)
+          .blur(radius: size * 0.05).offset(y: -size * 0.06).opacity(lid)
+      }
       RoundedRectangle(cornerRadius: size * 0.08)
         .fill(unlocked ? SabboStyle.forest : Color(.systemGray2))
         .frame(width: size * 0.78, height: size * 0.48).offset(y: size * 0.14)
       RoundedRectangle(cornerRadius: size * 0.12)
-        .fill(gold).frame(width: size * 0.84, height: size * 0.32).offset(y: -size * 0.1)
+        .fill(gold).frame(width: size * 0.84, height: size * 0.32)
+        .rotationEffect(.degrees(-22 * lid), anchor: .bottomLeading)
+        .offset(y: -size * (0.1 + 0.16 * CGFloat(lid)))
       HStack(spacing: size * 0.36) {
         Rectangle().fill(gold).frame(width: size * 0.07, height: size * 0.38)
         Rectangle().fill(gold).frame(width: size * 0.07, height: size * 0.38)
@@ -269,7 +289,19 @@ struct StreakRewardView: View {
   @Environment(\.scenePhase) private var scenePhase
   let presentation: RewardPresentation
   @State private var revealed = false
+  @State private var lid: Double
+  @State private var wobble = 0.0
+  @State private var opened: Bool
+  @State private var confetti = 0
   private var reward: StreakReward { presentation.reward }
+  /// Earned chests open with a short knock-knock-pop; previews and locks stay calm.
+  private var ceremony: Bool { presentation.access == .earned && presentation.revealsMessage }
+  init(presentation: RewardPresentation) {
+    self.presentation = presentation
+    let ceremony = presentation.access == .earned && presentation.revealsMessage
+    _lid = State(initialValue: presentation.revealsMessage && !ceremony ? 1 : 0)
+    _opened = State(initialValue: !ceremony)
+  }
   var body: some View {
     ScrollView {
       VStack(spacing: 24) {
@@ -278,14 +310,20 @@ struct StreakRewardView: View {
         }
         Label(reward.isStar ? "Stjernebelønning" : "Flammebelønning", systemImage: reward.isStar ? "star.fill" : "flame.fill")
           .font(.headline).foregroundStyle(reward.isStar ? .yellow : SabboStyle.orange)
-        RewardIcon(reward: reward, unlocked: presentation.revealsMessage, size: presentation.revealsMessage ? 140 : 180)
-          .scaleEffect(presentation.access == .earned && !reduceMotion && !revealed ? 0.85 : 1)
+        ZStack {
+          if ceremony && lid > 0 && !reduceMotion { ChestRays(size: 220).opacity(lid) }
+          RewardIcon(reward: reward, unlocked: presentation.revealsMessage, size: presentation.revealsMessage ? 140 : 180, lid: lid)
+            .rotationEffect(.degrees(wobble))
+            .scaleEffect(presentation.access == .earned && !reduceMotion && !revealed ? 0.85 : 1)
+        }.frame(height: presentation.revealsMessage ? 200 : 180)
+          .overlay { ConfettiBurst(trigger: confetti, intensity: .large).frame(width: 440, height: 560) }
           .onAppear {
             withAnimation(reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.55)) { revealed = true }
           }
+          .task { await openChest() }
         Text(presentation.access == .earned ? reward.title : reward.unlockLabel)
           .font(.system(.largeTitle, design: .rounded, weight: .heavy)).multilineTextAlignment(.center)
-        if presentation.revealsMessage {
+        if presentation.revealsMessage && opened {
           Text(reward.message).font(.title3.weight(.semibold)).multilineTextAlignment(.center)
             .accessibilityIdentifier("reward-message")
           if reward.day == 50 && NSDataAsset(name: ClientProfile.value.rewardAsset) != nil {
@@ -299,7 +337,7 @@ struct StreakRewardView: View {
               Label("Del belønningen", systemImage: "square.and.arrow.up")
             }.buttonStyle(PlayButton())
           }
-        } else {
+        } else if !presentation.revealsMessage {
           Text(reward.lockedMessage)
             .font(.title3).foregroundStyle(.secondary).multilineTextAlignment(.center)
             .accessibilityIdentifier("reward-unlock-day")
@@ -308,6 +346,27 @@ struct StreakRewardView: View {
           .accessibilityIdentifier("close-streak-reward")
       }.padding(28).padding(.top, 20).frame(maxWidth: 520).frame(maxWidth: .infinity)
     }.background(Color(.systemGroupedBackground))
+  }
+  private func openChest() async {
+    guard ceremony, !opened else { return }
+    if reduceMotion || UIAccessibility.isVoiceOverRunning {
+      lid = 1; opened = true
+      SabboFX.shared.play(.chestOpen); SabboFX.shared.haptic(.success)
+      return
+    }
+    do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
+    for angle in [-7.0, 7, -5] {
+      withAnimation(.easeInOut(duration: 0.07)) { wobble = angle }
+      SabboFX.shared.play(.chestKnock); SabboFX.shared.haptic(.knock)
+      do { try await Task.sleep(for: .milliseconds(150)) } catch { break }
+    }
+    withAnimation(.easeOut(duration: 0.08)) { wobble = 0 }
+    SabboFX.shared.play(.chestOpen); SabboFX.shared.haptic(.open)
+    withAnimation(.spring(response: 0.45, dampingFraction: 0.6)) { lid = 1 }
+    confetti += 1
+    try? await Task.sleep(for: .milliseconds(250))
+    withAnimation(.easeOut(duration: 0.35)) { opened = true }
+    SabboFX.shared.haptic(.success, after: 0.1)
   }
 }
 

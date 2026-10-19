@@ -75,6 +75,17 @@ extension ResultFlowTests {
     XCTAssertTrue(app.staticTexts["Veiledende karakter 5 av 6"].exists)
     XCTAssertFalse(app.staticTexts["Levert for sent"].exists)
   }
+  func testGradeRevealKeepsTheFinalGradeAccessibleAndLands() {
+    let app = open("graded")
+    XCTAssertTrue(app.staticTexts["Veiledende karakter 5 av 6"].exists)
+    let counting = XCTAttachment(screenshot: app.screenshot())
+    counting.name = "Grade reveal counting"; counting.lifetime = .keepAlways; add(counting)
+    XCTAssertTrue(app.staticTexts["Sterkt levert!"].waitForExistence(timeout: 6))
+    let landed = XCTAttachment(screenshot: app.screenshot())
+    landed.name = "Grade reveal landed"; landed.lifetime = .keepAlways; add(landed)
+    app.buttons["result-done"].tap()
+    XCTAssertTrue(app.buttons["start-question"].waitForExistence(timeout: 5))
+  }
 }
 
 
@@ -117,6 +128,18 @@ final class BonusFlowTests: XCTestCase {
     XCTAssertTrue(app.navigationBars["Streak"].waitForExistence(timeout: 5))
     let streak = XCTAttachment(screenshot: app.screenshot())
     streak.name = "Streak treasure chests"; streak.lifetime = .keepAlways; add(streak)
+  }
+  func testEarnedGiftOpensBeforeRevealingItsMessage() {
+    let app = open("waiting")
+    app.buttons["home-counter-stars"].tap()
+    XCTAssertTrue(app.navigationBars["Stjerner og achievements"].waitForExistence(timeout: 5))
+    app.buttons["stars-reward-50"].tap()
+    XCTAssertTrue(app.staticTexts["reward-message"].waitForExistence(timeout: 6))
+    XCTAssertFalse(app.staticTexts["reward-unlock-day"].exists)
+    let chest = XCTAttachment(screenshot: app.screenshot())
+    chest.name = "Opened star gift"; chest.lifetime = .keepAlways; add(chest)
+    app.buttons["close-streak-reward"].tap()
+    XCTAssertTrue(app.navigationBars["Stjerner og achievements"].waitForExistence(timeout: 5))
   }
   func testCountdownAndWardrobe() {
     let app = open("waiting")

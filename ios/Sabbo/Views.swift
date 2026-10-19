@@ -13,6 +13,7 @@ struct SabboRoot: View {
         login
       } else {
         navigation
+        .overlay(alignment: .top) { PeerDeliveredToast() }
         .sheet(isPresented: $question) { NavigationStack {
           if let day = model.local.today, day.question.parts != nil { GoalSessionView(day: day).id(day.id) }
           else { QuestionView() }
@@ -400,6 +401,8 @@ struct SubjectPathView: View {
 }
 struct SettingsView: View {
   @EnvironmentObject var model: AppModel
+  @AppStorage(SabboFX.soundKey) private var sound = true
+  @AppStorage(SabboFX.hapticsKey) private var haptics = true
   private func reminderBinding<Value>(_ keyPath: ReferenceWritableKeyPath<AppModel, Value>) -> Binding<Value> {
     Binding(get: { model[keyPath: keyPath] }, set: { model[keyPath: keyPath] = $0; model.reminderChanged() })
   }
@@ -428,6 +431,20 @@ struct SettingsView: View {
       } header: { Text("Varsler") } footer: {
         if model.reminderEnabled { Text("Tidspunktene følger norsk tid.") }
       }
+      Section {
+        Toggle("Lydeffekter", isOn: $sound).accessibilityIdentifier("fx-sound")
+        #if !targetEnvironment(macCatalyst)
+        Toggle("Vibrasjon", isOn: $haptics).accessibilityIdentifier("fx-haptics")
+        #endif
+      } header: { Text("Lyd og vibrasjon") } footer: {
+        #if targetEnvironment(macCatalyst)
+        Text("Korte lyder når du leverer, får karakter og åpner belønninger. De blandes med annen lyd.")
+        #else
+        Text("Korte lyder når du leverer, får karakter og åpner belønninger. De følger lydløsbryteren og blandes med annen lyd.")
+        #endif
+      }
+      .onChange(of: sound) { _, on in if on { SabboFX.shared.play(.step) } }
+      .onChange(of: haptics) { _, on in if on { SabboFX.shared.haptic(.success) } }
       if [ClientProfile.ownerID, "reviewer"].contains(model.session?.user_id ?? "") {
         Section { NavigationLink("Administrasjon") { AdministrationView() } }
       }

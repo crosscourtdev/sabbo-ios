@@ -250,7 +250,7 @@ struct GoalSessionView: View {
                 HStack {
                   Text("Oppgave \(i + 1)").font(.headline)
                   Spacer()
-                  Button("Endre") { index = i; reviewing = false; scroll.scrollTo("top") }
+                  Button("Endre") { advance { index = i; reviewing = false }; scroll.scrollTo("top") }
                 }
                 QuestionPrompt(question: part).font(.subheadline).foregroundStyle(.secondary)
                 Text(values[part.id] ?? "")
@@ -267,6 +267,10 @@ struct GoalSessionView: View {
                   delivered = submitted.answer
                   deliveredID = submitted.attempt_id
                 }
+                if delivered != nil {
+                  SabboFX.shared.play(.submit)
+                  SabboFX.shared.haptic(.success)
+                }
                 working = false
                 scroll.scrollTo("top")
               }
@@ -277,22 +281,33 @@ struct GoalSessionView: View {
           } else if !parts.isEmpty {
             let part = parts[min(index, parts.count - 1)]
             VStack(alignment: .leading, spacing: 10) {
-              HStack { Text("Oppgave \(index + 1) av \(parts.count)"); Spacer(); Text(StudyText.subject(day.question.subject_id)) }.font(.subheadline.weight(.semibold))
+              HStack {
+                Text("Oppgave \(index + 1) av \(parts.count)").contentTransition(.numericText(value: Double(index)))
+                Spacer(); Text(StudyText.subject(day.question.subject_id))
+              }.font(.subheadline.weight(.semibold))
               ProgressView(value: Double(index), total: Double(parts.count)).accessibilityLabel("Øktens fremdrift")
               DisclosureGroup("Dagens kompetansemål") { Text(day.question.prompt).font(.subheadline).padding(.top, 8) }
             }
-            StudyVisual(question: part, assignmentID: day.assignment.id, recordsOutfit: mode == "daily")
-            QuestionPrompt(question: part).font(.system(.title2, design: .rounded, weight: .bold)).fixedSize(horizontal: false, vertical: true)
-            QuestionMaterials(question: part)
-            Text("Ditt svar").font(.headline)
-            AnswerEditor(text: Binding(get: { AnswerSet.decode(raw)[part.id] ?? "" }, set: { value in
-              var values = AnswerSet.decode(raw); values[part.id] = value; raw = AnswerSet.encode(values); save()
-            }), blocked: { model.message = "Skriv svaret med egne ord." })
-              .frame(minHeight: 230).id(part.id)
+            // Overlapping parts cross-fade in place instead of pushing the layout around.
+            ZStack(alignment: .topLeading) {
+              VStack(alignment: .leading, spacing: 20) {
+                StudyVisual(question: part, assignmentID: day.assignment.id, recordsOutfit: mode == "daily")
+                QuestionPrompt(question: part).font(.system(.title2, design: .rounded, weight: .bold)).fixedSize(horizontal: false, vertical: true)
+                QuestionMaterials(question: part)
+                Text("Ditt svar").font(.headline)
+                AnswerEditor(text: Binding(get: { AnswerSet.decode(raw)[part.id] ?? "" }, set: { value in
+                  var values = AnswerSet.decode(raw); values[part.id] = value; raw = AnswerSet.encode(values); save()
+                }), blocked: { model.message = "Skriv svaret med egne ord." })
+                  .frame(minHeight: 230)
+              }.id(part.id)
+                .transition(reduceMotion ? .opacity : .asymmetric(insertion: .opacity.combined(with: .offset(y: 18)), removal: .opacity))
+            }
             HStack {
-              if index > 0 { Button("Tilbake") { index -= 1; scroll.scrollTo("top") }.frame(minHeight: 44) }
+              if index > 0 { Button("Tilbake") { advance { index -= 1 }; scroll.scrollTo("top") }.frame(minHeight: 44) }
               Button(index + 1 == parts.count ? "Se over svarene" : "Neste oppgave") {
-                if index + 1 == parts.count { reviewing = true } else { index += 1 }
+                SabboFX.shared.play(.step)
+                SabboFX.shared.haptic(.step)
+                advance { if index + 1 == parts.count { reviewing = true } else { index += 1 } }
                 scroll.scrollTo("top")
               }.buttonStyle(PlayButton())
                 .disabled((AnswerSet.decode(raw)[part.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -326,6 +341,9 @@ struct GoalSessionView: View {
       delivered = nil
       deliveredID = nil
     }
+  }
+  private func advance(_ change: () -> Void) {
+    withAnimation(reduceMotion ? .easeInOut(duration: 0.15) : .snappy(duration: 0.32), change)
   }
   func save() {
     guard answer == nil else { return }
