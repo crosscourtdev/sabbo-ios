@@ -37,6 +37,9 @@ import UserNotifications
     var seen = UserDefaults.standard.array(forKey: key) as? [Int] ?? []
     if !seen.contains(value.day) { seen.append(value.day); UserDefaults.standard.set(seen, forKey: key) }
   }
+  func gainCollected(_ key: String) -> Bool {
+    (UserDefaults.standard.stringArray(forKey: "sabbo.gains." + (session?.user_id ?? "signed-out")) ?? []).contains(key)
+  }
   func collectGain(_ key: String) -> Bool {
     let accountKey = "sabbo.gains." + (session?.user_id ?? "signed-out")
     var seen = UserDefaults.standard.stringArray(forKey: accountKey) ?? []

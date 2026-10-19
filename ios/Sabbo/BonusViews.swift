@@ -169,22 +169,60 @@ struct BonusPrizeView: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var appeared = false
   @State private var saving = false
+  @State private var flying = false
+  @State private var avatarPop = false
+  @State private var confetti = 0
+  private static let avatarSize: CGFloat = 96
+  private static let itemSize: CGFloat = 110
+  private static let spacing: CGFloat = 16
   var body: some View {
     if let b = model.local.bonus, model.bonusStatus == "won", let id = b.cosmetic_id {
       VStack(spacing: 14) {
         Text("Nytt tilbehør!").font(.system(.title2, design: .rounded, weight: .heavy))
-        CosmeticItemImage(id: id, size: 140)
-          .scaleEffect(appeared || reduceMotion ? 1 : 0.55)
-          .rotationEffect(.degrees(appeared || reduceMotion ? 0 : -12))
+        // Wearing it sends the item across onto the avatar.
+        HStack(spacing: Self.spacing) {
+          PlayerAvatar(userID: model.session?.user_id, size: Self.avatarSize)
+            .scaleEffect(avatarPop ? 1.12 : 1)
+          CosmeticItemImage(id: id, size: Self.itemSize)
+            .scaleEffect(flying ? 0.3 : appeared || reduceMotion ? 1 : 0.55)
+            .rotationEffect(.degrees(appeared || reduceMotion ? 0 : -12))
+            .offset(x: flying ? -(Self.spacing + (Self.avatarSize + Self.itemSize) / 2) : 0, y: flying ? -Self.avatarSize * 0.2 : 0)
+            .opacity(flying ? 0 : 1)
+        }
         Text(model.local.cosmetics?.items.first(where: { $0.id == id })?.name ?? "Låst opp")
           .font(.headline)
         let equipped = model.local.cosmetics?.people.first(where: { $0.user_id == model.session?.user_id })?.cosmetic_id == id
-        Button(equipped ? "I bruk" : "Ta på") { saving = true; Task { _ = await model.equipCosmetic(id); saving = false } }
+        Button(equipped ? "I bruk" : "Ta på") { wear(id) }
           .buttonStyle(PlayButton()).disabled(saving || equipped)
       }.padding(24).frame(maxWidth: .infinity)
         .background(SabboStyle.mint.opacity(0.35), in: RoundedRectangle(cornerRadius: 24))
+        .overlay { ConfettiBurst(trigger: confetti, intensity: .medium).frame(width: 420, height: 480) }
         .accessibilityIdentifier("cosmetic-unlocked")
-        .onAppear { withAnimation(reduceMotion ? nil : .spring(response: 0.5, dampingFraction: 0.55)) { appeared = true } }
+        .onAppear {
+          withAnimation(reduceMotion ? nil : .spring(response: 0.5, dampingFraction: 0.55)) { appeared = true }
+          if model.collectGain("prize:" + (b.id ?? b.day)) {
+            SabboFX.shared.play(.prize, after: 0.15)
+            SabboFX.shared.haptic(.success, after: 0.15)
+            confetti += 1
+          }
+        }
+    }
+  }
+  private func wear(_ id: String) {
+    saving = true
+    Task {
+      let worn = await model.equipCosmetic(id)
+      saving = false
+      guard worn else { return }
+      SabboFX.shared.play(.wear)
+      SabboFX.shared.haptic(.tap)
+      guard !reduceMotion else { return }
+      withAnimation(.easeIn(duration: 0.32)) { flying = true }
+      try? await Task.sleep(for: .milliseconds(300))
+      withAnimation(.spring(response: 0.3, dampingFraction: 0.45)) { avatarPop = true }
+      SabboFX.shared.haptic(.success)
+      try? await Task.sleep(for: .milliseconds(200))
+      withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) { avatarPop = false }
     }
   }
 }
