@@ -218,7 +218,7 @@ struct TreasureChest: View {
       RoundedRectangle(cornerRadius: size * 0.12)
         .fill(gold).frame(width: size * 0.84, height: size * 0.32)
         .rotationEffect(.degrees(-22 * lid), anchor: .bottomLeading)
-        .offset(y: -size * (0.1 + 0.16 * lid))
+        .offset(y: -size * (0.1 + 0.16 * CGFloat(lid)))
       HStack(spacing: size * 0.36) {
         Rectangle().fill(gold).frame(width: size * 0.07, height: size * 0.38)
         Rectangle().fill(gold).frame(width: size * 0.07, height: size * 0.38)

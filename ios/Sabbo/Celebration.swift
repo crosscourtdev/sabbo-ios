@@ -30,10 +30,12 @@ struct ConfettiBurst: View {
           guard age > 0, age < Self.lifetime else { continue }
           var context = canvas
           context.opacity = 1 - age / Self.lifetime
-          context.translateBy(x: origin.x + cos(piece.angle) * piece.speed * age,
-                              y: origin.y + sin(piece.angle) * piece.speed * age + 450 * age * age)
+          let dx = cos(piece.angle) * piece.speed * age
+          let dy = sin(piece.angle) * piece.speed * age + 450 * age * age
+          context.translateBy(x: origin.x + CGFloat(dx), y: origin.y + CGFloat(dy))
           context.rotate(by: .radians(piece.spin * age))
-          let rect = CGRect(x: -piece.size / 2, y: -piece.size / 2, width: piece.size, height: piece.shape == 0 ? piece.size * 0.5 : piece.size)
+          let side = CGFloat(piece.size)
+          let rect = CGRect(x: -side / 2, y: -side / 2, width: side, height: piece.shape == 0 ? side * 0.5 : side)
           let path = piece.shape == 1 ? Path(ellipseIn: rect) : piece.shape == 2 ? Self.star(rect) : Path(roundedRect: rect, cornerRadius: 1.5)
           context.fill(path, with: .color(piece.color))
         }
@@ -59,8 +61,8 @@ struct ConfettiBurst: View {
     var path = Path()
     let center = CGPoint(x: rect.midX, y: rect.midY)
     for index in 0..<10 {
-      let radius = (index.isMultiple(of: 2) ? 1 : 0.45) * rect.width / 2
-      let angle = Double(index) * .pi / 5 - .pi / 2
+      let radius: CGFloat = (index.isMultiple(of: 2) ? 1 : 0.45) * rect.width / 2
+      let angle = CGFloat(index) * .pi / 5 - .pi / 2
       let point = CGPoint(x: center.x + cos(angle) * radius, y: center.y + sin(angle) * radius)
       if index == 0 { path.move(to: point) } else { path.addLine(to: point) }
     }
@@ -93,7 +95,7 @@ struct GradeHeadline: View {
     HStack(spacing: 16) {
       ZStack {
         Circle().stroke(color.opacity(0.18), lineWidth: 8)
-        Circle().trim(from: 0, to: Double(shown) / 6)
+        Circle().trim(from: 0, to: CGFloat(shown) / 6)
           .stroke(color, style: StrokeStyle(lineWidth: 8, lineCap: .round)).rotationEffect(.degrees(-90))
         Image(systemName: "star.fill").font(.title3).foregroundStyle(color)
           .symbolEffect(.bounce, value: landed)
