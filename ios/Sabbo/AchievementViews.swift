@@ -21,18 +21,53 @@ struct HomeCounters: View {
     }
   }
   private func counter(_ id: String, value: Int, symbol: String, color: Color, label: String) -> some View {
-    Button { destination = id } label: {
+    CounterChip(value: value, symbol: symbol, color: color, stars: id == "stars") { destination = id }
+      .accessibilityLabel("\(value) \(label)")
+      .accessibilityHint(id == "stars" ? "Vis stjernekister og prestasjoner" : "Vis rekken og belønningene")
+      .accessibilityIdentifier("home-counter-" + id)
+  }
+}
+
+private struct CounterChip: View {
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  let value: Int
+  let symbol: String
+  let color: Color
+  let stars: Bool
+  var action: () -> Void
+  @State private var gathering = false
+  @State private var arrived = false
+  @State private var animationID = UUID()
+  var body: some View {
+    Button(action: action) {
       HStack(spacing: 6) {
-        Image(systemName: symbol).foregroundStyle(color)
-          .symbolEffect(.bounce, value: reduceMotion ? 0 : value)
+        Image(systemName: symbol).foregroundStyle(color).symbolEffect(.bounce, value: reduceMotion ? 0 : value)
         Text("\(value)").foregroundStyle(.primary).contentTransition(.numericText())
       }.font(.system(.title3, design: .rounded, weight: .heavy))
         .padding(.horizontal, 14).padding(.vertical, 12)
         .background(Color(.secondarySystemGroupedBackground), in: Capsule())
-    }.buttonStyle(.plain).accessibilityLabel("\(value) \(label)")
-      .accessibilityHint(id == "stars" ? "Vis stjernekister og prestasjoner" : "Vis rekken og belønningene")
-      .accessibilityIdentifier("home-counter-" + id)
+        .overlay {
+          if gathering {
+            ForEach(0..<4) { index in
+              Image(systemName: "star.fill").font(.caption).foregroundStyle(.yellow)
+                .offset(x: arrived ? 0 : CGFloat(index - 2) * 16, y: arrived ? 0 : 52 + CGFloat(index % 2) * 12)
+                .opacity(arrived ? 0 : 1).scaleEffect(arrived ? 0.4 : 1)
+            }.accessibilityHidden(true)
+          }
+        }
+    }.buttonStyle(.plain)
       .animation(reduceMotion ? nil : .spring(duration: 0.45), value: value)
+      .onChange(of: value) { old, new in
+        guard stars, new > old, !reduceMotion else { return }
+        let id = UUID(); animationID = id; arrived = false; gathering = true
+        Task {
+          try? await Task.sleep(for: .milliseconds(30))
+          guard animationID == id else { return }
+          withAnimation(.easeOut(duration: 0.8)) { arrived = true }
+          try? await Task.sleep(for: .milliseconds(850))
+          if animationID == id { gathering = false }
+        }
+      }
   }
 }
 
