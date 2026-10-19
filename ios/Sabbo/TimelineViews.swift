@@ -48,6 +48,10 @@ struct DayResultsContent: View {
           ForEach(people) { p in Text(p.id == ownID ? "Meg" : p.name).tag(p.id) }
         }.pickerStyle(.segmented).accessibilityIdentifier("result-person")
       }
+      if loaded != nil, people.count > 1, people.allSatisfy({ $0.daily != nil }),
+         assignment.day == model.local.today?.server_day, !model.answersLocked(question) {
+        SharedUnlockBanner(key: "together:" + assignment.id)
+      }
       if !bonus.isEmpty {
         Picker("Runde", selection: $stage) {
           Text("Dagens økt").tag("daily")

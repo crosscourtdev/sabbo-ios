@@ -87,11 +87,20 @@ struct QuestGainsView: View {
       }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
         .background(SabboStyle.mint.opacity(0.5), in: RoundedRectangle(cornerRadius: 18))
       .task(id: key) {
-        if earnedFire, model.collectGain("fire:\(model.ownStreak?.epoch ?? ""):\(attemptID)"), !reduceMotion {
-          firePulse += 1
+        // Let a grade revealed alongside these gains land first.
+        do { try await Task.sleep(for: .milliseconds(1400)) } catch { return }
+        if earnedFire, model.collectGain("fire:\(model.ownStreak?.epoch ?? ""):\(attemptID)") {
+          if !reduceMotion { firePulse += 1 }
+          SabboFX.shared.play(.streak)
+          SabboFX.shared.haptic(.success)
         }
-        if let award, model.collectGain("stars:\(model.ownProgress?.stars.epoch ?? ""):\(award.id)"), !reduceMotion {
-          starPulse += 1
+        if let award, model.collectGain("stars:\(model.ownProgress?.stars.epoch ?? ""):\(award.id)") {
+          if !reduceMotion { starPulse += 1 }
+          for index in 0..<min(award.stars, 6) {
+            let delay = (earnedFire ? 0.45 : 0) + Double(index) * 0.09
+            SabboFX.shared.play(.star, after: delay)
+            SabboFX.shared.haptic(.tick(0.4 + 0.08 * Double(index)), after: delay)
+          }
         }
       }
     }
