@@ -30,6 +30,9 @@ struct StudyVisual: View {
   let question: Question
   var maximumHeight: CGFloat = 200
   var assignmentID: String? = nil
+  var recordsOutfit = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @State private var revealed = false
   @State private var downloaded: UIImage?
   private var assignment: String? { assignmentID ?? inheritedAssignment }
   private var identity: String { (model.session?.user_id ?? "") + ":" + (assignment ?? "") + ":" + question.id }
@@ -42,7 +45,14 @@ struct StudyVisual: View {
           .frame(maxWidth: .infinity).accessibilityHidden(true)
       }
     }
-    .task(id: identity) { downloaded = nil; await load() }
+    .opacity(revealed ? 1 : 0)
+    .task(id: identity) {
+      downloaded = nil; revealed = false
+      await Task.yield()
+      guard !Task.isCancelled else { return }
+      withAnimation(reduceMotion ? nil : .easeOut(duration: 0.3)) { revealed = true }
+      await load()
+    }
     .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await load() } } }
     .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
       if scenePhase == .active && downloaded == nil { Task { await load() } }
@@ -52,7 +62,13 @@ struct StudyVisual: View {
     guard !model.testing, let assignment, let account = model.session?.user_id else { return }
     let current = identity
     if let data = await ArtworkCache.shared.image(api: model.api, account: account, assignment: assignment, question: question.id),
-      current == identity, !Task.isCancelled { downloaded = UIImage(data: data) }
+      current == identity, !Task.isCancelled {
+      downloaded = UIImage(data: data)
+      if recordsOutfit, downloaded != nil {
+        let _: Empty? = try? await model.api.send("/assignments/" + assignment + "/artwork/" + ArtworkImage.hash(data) + "/seen", body: [:])
+        await model.refreshProgress()
+      }
+    }
   }
 }
 
@@ -265,7 +281,7 @@ struct GoalSessionView: View {
               ProgressView(value: Double(index), total: Double(parts.count)).accessibilityLabel("Øktens fremdrift")
               DisclosureGroup("Dagens kompetansemål") { Text(day.question.prompt).font(.subheadline).padding(.top, 8) }
             }
-            StudyVisual(question: part, assignmentID: day.assignment.id)
+            StudyVisual(question: part, assignmentID: day.assignment.id, recordsOutfit: mode == "daily")
             QuestionPrompt(question: part).font(.system(.title2, design: .rounded, weight: .bold)).fixedSize(horizontal: false, vertical: true)
             QuestionMaterials(question: part)
             Text("Ditt svar").font(.headline)

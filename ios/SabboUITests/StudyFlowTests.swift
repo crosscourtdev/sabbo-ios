@@ -94,6 +94,24 @@ final class BonusFlowTests: XCTestCase {
     XCTAssertTrue(app.staticTexts["Ingen bonusrunde i dag"].exists)
     XCTAssertFalse(app.buttons["start-bonus"].exists)
   }
+  func testHomeCountersAndAchievements() {
+    let app = open("waiting")
+    XCTAssertTrue(app.buttons["home-counter-stars"].exists)
+    XCTAssertTrue(app.buttons["home-counter-fire"].exists)
+    let home = XCTAttachment(screenshot: app.screenshot())
+    home.name = "Compact quest home"; home.lifetime = .keepAlways; add(home)
+    app.buttons["home-counter-stars"].tap()
+    XCTAssertTrue(app.navigationBars["Stjerner og prestasjoner"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.staticTexts["Studious"].exists)
+    XCTAssertTrue(app.staticTexts["Drip check"].exists)
+    let rewards = XCTAttachment(screenshot: app.screenshot())
+    rewards.name = "Star rewards and achievements"; rewards.lifetime = .keepAlways; add(rewards)
+    app.buttons["stars-reward-150"].tap()
+    XCTAssertTrue(app.staticTexts["reward-unlock-day"].waitForExistence(timeout: 5))
+    app.buttons["close-streak-reward"].tap()
+    XCTAssertTrue(app.navigationBars["Stjerner og prestasjoner"].waitForExistence(timeout: 5))
+
+  }
   func testCountdownAndWardrobe() {
     let app = open("waiting")
     XCTAssertTrue(app.staticTexts["Klar om 3 t 0 min"].exists)

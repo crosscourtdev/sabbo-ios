@@ -58,7 +58,7 @@ extension AppModel {
   }
 
   func syncCurrentDraft() async {
-    guard !testing, !draftSyncing, let account = session, let id = local.today?.id,
+    guard !storageReadFailed, !testing, !draftSyncing, let account = session, let id = local.today?.id,
           !hasSubmitted else { return }
     draftSyncing = true
     defer { draftSyncing = false }

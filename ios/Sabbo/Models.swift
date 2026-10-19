@@ -269,6 +269,7 @@ struct PersonProgress: Codable, Identifiable {
   let streak: Streak
   let stars: Stars
   let fire_attempt_id: String?
+  var achievements: [Achievement]? = nil
 }
 struct PairProgress: Codable { let people: [PersonProgress] }
 struct SharedSession: Decodable, Identifiable {
@@ -428,4 +429,17 @@ struct ClientProfile: Decodable {
   static var learnerID: String { value.learnerID }
   static var ownerName: String { value.ownerName }
   static var learnerName: String { value.learnerName }
+}
+
+struct Achievement: Codable, Identifiable {
+  let id: String
+  let title: String
+  let description: String
+  let target: Int
+  let progress: Int
+  let stars: Int
+  let symbol: String
+  let earned_at: String?
+  let attempt_id: String?
+  var earned: Bool { earned_at != nil }
 }
