@@ -136,7 +136,8 @@ struct RewardCollection: View {
                 .accessibilityLabel("Stjernegave, \(reward.threshold) stjerner")
             }
           }
-          Text("Achievements").font(.system(.title2, design: .rounded, weight: .bold))
+          Label("Achievements", systemImage: "trophy.fill")
+            .font(.system(.title2, design: .rounded, weight: .bold))
           ForEach(model.ownProgress?.achievements ?? []) { item in
             AchievementRow(achievement: item).padding(16)
               .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22))
