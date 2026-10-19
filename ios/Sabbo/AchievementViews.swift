@@ -14,19 +14,30 @@ struct HomeCounters: View {
           }.padding(.trailing, 8).padding(.bottom, 8)
       }.buttonStyle(.plain).accessibilityLabel("Bytt tilbehør").accessibilityIdentifier("avatar-picker")
       Spacer(minLength: 0)
-      counter("fire", value: model.ownStreak?.current ?? 0, symbol: "flame.fill", color: SabboStyle.orange, label: "dager på rad")
+      counter("fire", value: model.ownStreak?.current ?? 0, symbol: "flame.fill", color: SabboStyle.orange, label: "dager på rad", flame: flame)
       counter("stars", value: model.ownProgress?.stars.total ?? 0, symbol: "star.fill", color: .yellow, label: "stjerner")
     }.sheet(isPresented: Binding(get: { destination != nil }, set: { if !$0 { destination = nil } })) {
       NavigationStack { RewardCollection(stars: destination == "stars") }.desktopSheet()
     }
   }
-  private func counter(_ id: String, value: Int, symbol: String, color: Color, label: String) -> some View {
-    CounterChip(value: value, symbol: symbol, color: color, stars: id == "stars") { destination = id }
+  /// The flame is dim until today's session is delivered and wiggles from 18:00 while a streak is at risk.
+  private var flame: FlameState {
+    guard let streak = model.ownStreak else { return .none }
+    if streak.completed_today || model.hasSubmitted { return .lit }
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = StudyText.oslo
+    return streak.current > 0 && calendar.component(.hour, from: model.bonusNow) >= 18 ? .atRisk : .waiting
+  }
+  private func counter(_ id: String, value: Int, symbol: String, color: Color, label: String, flame: FlameState = .none) -> some View {
+    CounterChip(value: value, symbol: symbol, color: color, stars: id == "stars", flame: flame) { destination = id }
       .accessibilityLabel("\(value) \(label)")
+      .accessibilityValue(flame == .atRisk ? "Lever i dag for å holde rekken" : flame == .lit ? "Levert i dag" : "")
       .accessibilityHint(id == "stars" ? "Vis stjernekister og prestasjoner" : "Vis rekken og belønningene")
       .accessibilityIdentifier("home-counter-" + id)
   }
 }
+
+enum FlameState { case none, waiting, atRisk, lit }
 
 private struct CounterChip: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -34,6 +45,7 @@ private struct CounterChip: View {
   let symbol: String
   let color: Color
   let stars: Bool
+  var flame: FlameState = .none
   var action: () -> Void
   @State private var gathering = false
   @State private var arrived = false
@@ -41,7 +53,11 @@ private struct CounterChip: View {
   var body: some View {
     Button(action: action) {
       HStack(spacing: 6) {
-        Image(systemName: symbol).foregroundStyle(color).symbolEffect(.bounce, value: reduceMotion ? 0 : value)
+        Image(systemName: symbol).foregroundStyle(color)
+          .opacity(flame == .waiting || flame == .atRisk ? 0.55 : 1)
+          .symbolEffect(.bounce, value: reduceMotion ? 0 : value)
+          .symbolEffect(.breathe, isActive: flame == .lit && !reduceMotion && SabboFX.continuousMotion)
+          .symbolEffect(.wiggle, isActive: flame == .atRisk && !reduceMotion && SabboFX.continuousMotion)
         Text("\(value)").foregroundStyle(.primary).contentTransition(.numericText())
       }.font(.system(.title3, design: .rounded, weight: .heavy))
         .padding(.horizontal, 14).padding(.vertical, 12)
