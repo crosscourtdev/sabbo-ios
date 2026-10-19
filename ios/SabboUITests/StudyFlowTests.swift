@@ -182,7 +182,10 @@ extension ResultFlowTests {
     timeline.name = "Shared timeline"; timeline.lifetime = .keepAlways; add(timeline)
     day.tap()
     XCTAssertTrue(app.staticTexts["Veiledende karakter 5 av 6"].waitForExistence(timeout: 5))
-    app.segmentedControls["result-stage"].buttons["Bonusrunde"].tap()
+    let bonusButton = app.segmentedControls["result-stage"].buttons["Bonusrunde"]
+    XCTAssertFalse(app.staticTexts["Veiledende karakter 5 av 6"].frame.intersects(bonusButton.frame),
+      "Decorative grade confetti must not cover the result selector's accessibility area")
+    bonusButton.tap()
     XCTAssertTrue(app.staticTexts["Veiledende karakter 6 av 6"].waitForExistence(timeout: 5))
     let bonus = XCTAttachment(screenshot: app.screenshot())
     bonus.name = "Bonus result"; bonus.lifetime = .keepAlways; add(bonus)
