@@ -191,7 +191,7 @@ struct TodayView: View {
             HStack {
               SubjectPill(id: t.question.subject_id)
               Spacer()
-              Text(t.question.parts?.count == nil ? "1 oppgave" : "\(t.question.parts?.count ?? 1) oppgaver").font(.caption.bold()).foregroundStyle(.secondary)
+              Text((t.question.parts?.count ?? 1) == 1 ? "1 oppgave" : "\(t.question.parts?.count ?? 1) oppgaver").font(.caption.bold()).foregroundStyle(.secondary)
             }
             Text(t.question.title ?? "Dagens utfordring")
               .font(.system(.title, design: .rounded, weight: .bold))
