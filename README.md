@@ -53,3 +53,17 @@ acceptance. Distribution-specific resources need separate validation.
 Code, original sample exercises and placeholder artwork in this repository are
 MIT licensed; see [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md). Contributions
 are welcome under that license. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+Home counters open streak rewards or star rewards and achievements. Question
+illustrations are revealed inside the daily quest. Achievement titles and
+Norwegian descriptions come from the authenticated progress response; old cached
+progress without achievements remains readable.
+
+Before reading or replacing an existing local state file, the client keeps an
+untouched `Recovery/before-achievements-v1-<account>.json` copy. It is never
+rotated automatically. Decode failures block normal sync and persistence rather
+than replacing the file with empty state. **Mine data → Eksporter lokale utkast**
+exports the original copy and current local file without a network request or
+credentials (base64 preserves even malformed bytes). The recovery copy does not
+prove any particular unsynced answer exists. Explicit account-data deletion also
+removes that account's local recovery copy; updating through TestFlight does not.

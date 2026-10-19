@@ -186,25 +186,13 @@ struct TodayView: View {
     ScrollView {
       VStack(alignment: .leading, spacing: 24) {
         if let t = model.local.today {
-          HStack(alignment: .center, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-              Text(model.pending?.attempt_id == nil && model.pending != nil ? "Lagret på telefonen" : model.complete ? "Godt jobbet!" : "Hei, \(model.userName)!")
-                .font(.system(.largeTitle, design: .rounded, weight: .heavy))
-            }
-            Spacer(minLength: 0)
-            Button { cosmetics = true } label: {
-              PlayerAvatar(userID: model.session?.user_id, size: 72)
-                .overlay(alignment: .bottomTrailing) {
-                  Image(systemName: "tshirt.fill").font(.caption).padding(6).background(.regularMaterial, in: Circle())
-                    .offset(x: 8, y: 8)
-                }
-                .padding(.trailing, 8).padding(.bottom, 8)
-                .contentShape(Rectangle())
-            }.buttonStyle(.plain).accessibilityLabel("Bytt tilbehør").accessibilityIdentifier("avatar-picker")
-          }
+          HomeCounters(openWardrobe: { cosmetics = true })
           VStack(alignment: .leading, spacing: 20) {
-            SubjectPill(id: t.question.subject_id)
-            StudyVisual(question: t.question.parts?.first ?? t.question, maximumHeight: 150, assignmentID: t.assignment.id)
+            HStack {
+              SubjectPill(id: t.question.subject_id)
+              Spacer()
+              Text("\(t.question.parts?.count ?? 1) oppgaver").font(.caption.bold()).foregroundStyle(.secondary)
+            }
             Text(t.question.title ?? "Dagens utfordring")
               .font(.system(.title, design: .rounded, weight: .bold))
             if !model.hasSubmitted {
@@ -215,6 +203,8 @@ struct TodayView: View {
                 .font(.system(.title2, design: .rounded, weight: .bold))
                 .foregroundStyle(Color("AccentColor"))
             }
+            if let id = model.currentAttemptID { QuestGainsView(attemptID: id) }
+            AchievementCelebration()
             if model.hasSubmitted, ["ready", "retry", "grading_failed"].contains(model.bonusStatus) {
               Divider()
               BonusStage()
@@ -237,6 +227,7 @@ struct TodayView: View {
             }
           }.padding(22).background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 28))
           ProgressPanel()
+          AchievementPreview()
 
         } else {
           ContentUnavailableView("Dagens økt", systemImage: "books.vertical", description: Text("Oppdater for å hente oppgavene."))
@@ -515,7 +506,16 @@ struct AccountDataView: View {
   var body: some View {
     Form {
       Section {
-        Button("Eksporter mine svar") {
+        Button("Eksporter lokale utkast") {
+          do {
+            guard let source = model.file() else { return }
+            let data = try LocalRecovery.export(source)
+            let file = FileManager.default.temporaryDirectory.appendingPathComponent("sabbo-local-recovery.json")
+            try data.write(to: file, options: [.atomic, .completeFileProtection])
+            exportURL = file
+          } catch { model.message = "Kunne ikke eksportere lokale utkast. Originalene er beholdt." }
+        }.accessibilityIdentifier("export-local-drafts")
+        Button("Eksporter innleverte svar") {
           Task {
             do {
               let data: Data = try await exportData()
@@ -538,7 +538,10 @@ struct AccountDataView: View {
           Task {
             do {
               let _: Empty = try await model.api.request("/history", method: "DELETE")
-              if let f = model.file() { try? FileManager.default.removeItem(at: f) }
+              if let f = model.file() {
+                try? FileManager.default.removeItem(at: f)
+                try? FileManager.default.removeItem(at: LocalRecovery.snapshotURL(for: f))
+              }
               Vault.clear()
               model.session = nil
               model.local = LocalState()

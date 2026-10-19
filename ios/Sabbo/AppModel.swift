@@ -135,17 +135,22 @@ import UserNotifications
     try? excluded.setResourceValues(values)
     return folder.appendingPathComponent(user + ".json")
   }
+  private(set) var storageReadFailed = false
   func restore() {
-    if let f = file(), let data = try? Data(contentsOf: f),
-      let state = try? JSONDecoder().decode(LocalState.self, from: data)
-    {
-      local = state
-      editor = state.today.flatMap { state.drafts[$0.assignment.id] } ?? ""
+    storageReadFailed = false
+    guard let f = file(), FileManager.default.fileExists(atPath: f.path) else { return }
+    do {
+      local = try LocalRecovery.load(f)
+      editor = local.today.flatMap { local.drafts[$0.assignment.id] } ?? ""
+    } catch {
+      storageReadFailed = true
+      message = "Kunne ikke åpne lagrede svar. Originalen er beholdt. Eksporter lokale utkast under Mine data."
     }
   }
   @discardableResult func persist() -> Bool {
-    guard let f = file() else { return false }
+    guard !storageReadFailed, let f = file() else { return false }
     do {
+      try LocalRecovery.preserve(f)
       try JSONEncoder().encode(local).write(
         to: f, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
       return true
@@ -197,7 +202,7 @@ import UserNotifications
   }
   func refresh() async {
     if testing { return }
-    guard let refreshAccount = session, !syncing else { return }
+    guard !storageReadFailed, let refreshAccount = session, !syncing else { return }
     syncing = true
     defer { syncing = false }
     do { try await syncPending() } catch {
@@ -290,7 +295,7 @@ import UserNotifications
     mode: String = "daily", assignment: Assignment? = nil, question: Question? = nil,
     answer: String? = nil
   ) async -> Pending? {
-    guard let a = assignment ?? local.today?.assignment, let q = question ?? local.today?.question
+    guard !storageReadFailed, let a = assignment ?? local.today?.assignment, let q = question ?? local.today?.question
     else { return nil }
     let text = answer ?? editor
     guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -368,7 +373,7 @@ import UserNotifications
     return "Svaret er lagret på enheten. " + StudyText.failure(error, action: "Synkroniser")
   }
   func syncPending() async throws {
-    if testing { return }
+    if testing || storageReadFailed { return }
     if let pendingSync { try await pendingSync.value; return }
     let task = Task { try await self.performPendingSync() }
     pendingSync = task

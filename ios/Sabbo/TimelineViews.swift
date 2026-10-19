@@ -78,6 +78,7 @@ struct DayResultsContent: View {
         attempt(daily)
         if mine {
           QuestGainsView(attemptID: daily.id)
+          AchievementCelebration(attemptID: daily.id)
           SessionRewardsView()
         }
         if currentBonus {

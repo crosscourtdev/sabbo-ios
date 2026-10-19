@@ -10,22 +10,13 @@ struct ProgressPanel: View {
             label: streak.current == 1 ? "dag på rad" : "dager på rad", symbol: "flame.fill",
             color: SabboStyle.orange, rewards: StreakReward.milestones)
         }
-        if let stars = model.ownProgress?.stars {
-          if model.ownStreak != nil { Divider() }
-          RewardTrack(value: stars.total, best: stars.total, label: "stjerner", symbol: "star.fill",
-            color: .yellow, rewards: StreakReward.starMilestones)
-        }
-        DisclosureGroup("Slik fungerer belønningene") {
-          Text("En fullført dagsøkt gir én dag på rad. Karakter 1–6 gir 1–6 stjerner når vurderingen er klar. Første innlevering per dag teller. Stjerner og opptjente kister beholdes ved en pause.")
-            .font(.subheadline).padding(.top, 8)
-        }.font(.caption).foregroundStyle(.secondary)
       }.padding(20).background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 26))
         .accessibilityIdentifier("reward-progress")
     }
   }
 }
 
-private struct RewardTrack: View {
+struct RewardTrack: View {
   @EnvironmentObject var model: AppModel
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   let value: Int
@@ -53,7 +44,10 @@ private struct RewardTrack: View {
                 Capsule().fill(color).frame(width: geometry.size.width * fraction)
               }
             }.frame(height: 6).accessibilityHidden(true)
-            Button { model.openReward(reward) } label: {
+            NavigationLink {
+                let presentation = reward.presentation(userID: model.session?.user_id, best: model.rewardValue(reward))
+                StreakRewardView(presentation: presentation).onAppear { model.rewardShown(presentation) }
+              } label: {
               VStack(spacing: 4) {
                 TreasureChest(unlocked: access == .earned, size: 48)
                 Text(reward.isStar ? "\(reward.threshold) ★" : "Dag \(reward.threshold)")
