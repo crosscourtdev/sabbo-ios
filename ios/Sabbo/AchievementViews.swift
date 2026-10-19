@@ -23,7 +23,7 @@ struct HomeCounters: View {
   private func counter(_ id: String, value: Int, symbol: String, color: Color, label: String) -> some View {
     CounterChip(value: value, symbol: symbol, color: color, stars: id == "stars") { destination = id }
       .accessibilityLabel("\(value) \(label)")
-      .accessibilityHint(id == "stars" ? "Vis stjernegaver og prestasjoner" : "Vis rekken og belønningene")
+      .accessibilityHint(id == "stars" ? "Vis stjernegaver og achievements" : "Vis streak og belønningene")
       .accessibilityIdentifier("home-counter-" + id)
   }
 }
@@ -136,20 +136,20 @@ struct RewardCollection: View {
                 .accessibilityLabel("Stjernegave, \(reward.threshold) stjerner")
             }
           }
-          Text("Prestasjoner").font(.system(.title2, design: .rounded, weight: .bold))
+          Text("Achievements").font(.system(.title2, design: .rounded, weight: .bold))
           ForEach(model.ownProgress?.achievements ?? []) { item in
             AchievementRow(achievement: item).padding(16)
               .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22))
           }
-          Text("Karakteren gir 1–6 stjerner. Hver prestasjon gir 25 ekstra, én gang. Bare aktivitet etter at prestasjonene ble lansert teller.")
+          Text("Karakteren gir 1–6 stjerner. Hver achievement gir 25 ekstra, én gang. Bare aktivitet etter lanseringen teller.")
             .font(.footnote).foregroundStyle(.secondary)
         } else {
           ProgressPanel()
-          Text("Lever dagsøkten før midnatt for å holde rekken. Opptjente kister beholdes ved en pause.")
+          Text("Lever dagsøkten før midnatt for å holde streaken. Opptjente kister beholdes ved en pause.")
             .font(.subheadline).foregroundStyle(.secondary)
         }
       }.padding(22).frame(maxWidth: 620).frame(maxWidth: .infinity)
-    }.background(Color(.systemGroupedBackground)).navigationTitle(stars ? "Stjerner og prestasjoner" : "Rekken din")
+    }.background(Color(.systemGroupedBackground)).navigationTitle(stars ? "Stjerner og achievements" : "Streak")
       .navigationBarTitleDisplayMode(.inline)
       .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Ferdig") { dismiss() } } }
   }
@@ -170,7 +170,7 @@ struct AchievementCelebration: View {
   var body: some View {
     ForEach(unseen) { item in
       VStack(alignment: .leading, spacing: 12) {
-        Text("Prestasjon låst opp!").font(.caption.bold()).foregroundStyle(Color("AccentColor"))
+        Text("Achievement låst opp!").font(.caption.bold()).foregroundStyle(Color("AccentColor"))
         AchievementRow(achievement: item)
         Button("Herlig!") {
           dismissed.insert(item.id)

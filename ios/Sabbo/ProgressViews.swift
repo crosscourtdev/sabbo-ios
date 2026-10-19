@@ -28,7 +28,7 @@ struct RewardTrack: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
       HStack {
-        Text("Rekken din").font(.system(.title3, design: .rounded, weight: .bold))
+        Text("Streak").font(.system(.title3, design: .rounded, weight: .bold))
         Spacer()
         if let next = rewards.first(where: { $0.threshold > best }) {
           Text("\(max(0, next.threshold - value)) dager til neste kiste").font(.caption).foregroundStyle(.secondary)
@@ -98,7 +98,7 @@ struct QuestGainsView: View {
   }
   @ViewBuilder private var badges: some View {
     if earnedFire {
-      GainBadge(symbol: "flame.fill", text: "+1 dag i rekken", detail: "", color: SabboStyle.orange, pulse: firePulse)
+      GainBadge(symbol: "flame.fill", text: "+1 dag i streaken", detail: "", color: SabboStyle.orange, pulse: firePulse)
     }
     if let award {
       GainBadge(symbol: "star.fill", text: "+\(award.stars) stjerner", detail: "", color: .yellow, pulse: starPulse)
