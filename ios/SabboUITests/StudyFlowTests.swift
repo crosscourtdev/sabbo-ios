@@ -124,6 +124,9 @@ final class BonusFlowTests: XCTestCase {
     app.buttons["close-streak-reward"].tap()
     XCTAssertTrue(app.navigationBars["Stjerner og achievements"].waitForExistence(timeout: 5))
     app.buttons["Ferdig"].tap()
+    let dismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"),
+      object: app.navigationBars["Stjerner og achievements"])
+    XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 5), .completed)
     app.buttons["home-counter-fire"].tap()
     XCTAssertTrue(app.navigationBars["Streak"].waitForExistence(timeout: 5))
     let streak = XCTAttachment(screenshot: app.screenshot())
