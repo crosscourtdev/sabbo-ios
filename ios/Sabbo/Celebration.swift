@@ -106,6 +106,7 @@ struct GradeHeadline: View {
           .foregroundStyle(Color("AccentColor"))
           .contentTransition(.numericText(value: Double(shown)))
           .accessibilityLabel("Veiledende karakter \(grade) av 6")
+          .contentShape([.interaction, .accessibility], Rectangle())
         if landed {
           Text(GradeCelebration.phrase(grade)).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
             .transition(.opacity.combined(with: .offset(y: 6)))
@@ -115,14 +116,17 @@ struct GradeHeadline: View {
     }
     .scaleEffect(pop ? 1.08 : 1, anchor: .leading)
     .overlay {
-      // Keep the overlay's bounds on the headline; overflowing confetti must
-      // never enlarge the grade's accessibility frame over adjacent controls.
+      // Keep confetti decorative while its particles overflow the headline.
       GeometryReader { geometry in
         ConfettiBurst(trigger: confetti, intensity: GradeCelebration.confetti(grade))
           .frame(width: 440, height: 520)
           .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
       }.allowsHitTesting(false).accessibilityHidden(true)
     }
+    // iOS includes overflowing overlay descendants in its inferred AX bounds.
+    // Explicit shapes keep navigation above the headline reachable without
+    // clipping the celebration or changing its visual size.
+    .contentShape([.interaction, .accessibility], Rectangle())
     .accessibilityIdentifier("grade-headline")
     .task {
       guard celebrates, model.collectGain(key) else {
