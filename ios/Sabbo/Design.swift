@@ -195,6 +195,57 @@ struct EvaluationCard: View {
   }
 }
 
+struct RewardIcon: View {
+  let reward: StreakReward
+  var unlocked = false
+  var size: CGFloat = 64
+  var lid: Double = 0
+  var body: some View {
+    if reward.isStar {
+      StarGiftBox(unlocked: unlocked, size: size, lid: lid)
+    } else {
+      TreasureChest(unlocked: unlocked, size: size, lid: lid)
+    }
+  }
+}
+
+struct StarGiftBox: View {
+  var unlocked = false
+  var size: CGFloat = 64
+  var lid: Double = 0
+  private var box: Color { unlocked ? Color(red: 0.55, green: 0.32, blue: 0.85) : Color(red: 0.63, green: 0.58, blue: 0.71) }
+  private var ribbon: Color { unlocked ? Color(red: 1, green: 0.77, blue: 0.35) : Color(red: 0.85, green: 0.81, blue: 0.92) }
+  var body: some View {
+    ZStack {
+      if unlocked {
+        Circle().fill(box.opacity(0.12)).frame(width: size, height: size)
+        Image(systemName: "sparkles").font(.system(size: size * 0.22, weight: .bold))
+          .foregroundStyle(ribbon).offset(x: size * 0.34, y: -size * 0.32)
+      }
+      RoundedRectangle(cornerRadius: size * 0.05)
+        .fill(box).frame(width: size * 0.68, height: size * 0.57).offset(y: size * 0.12)
+        .shadow(color: .black.opacity(0.12), radius: size * 0.02, y: size * 0.03)
+      Rectangle().fill(ribbon).frame(width: size * 0.13, height: size * 0.57).offset(y: size * 0.12)
+      ZStack {
+        RoundedRectangle(cornerRadius: size * 0.03)
+          .fill(box).frame(width: size * 0.8, height: size * 0.14).offset(y: -size * 0.15)
+        Rectangle().fill(ribbon).frame(width: size * 0.13, height: size * 0.14).offset(y: -size * 0.15)
+        Ellipse().stroke(ribbon, lineWidth: size * 0.065)
+          .frame(width: size * 0.27, height: size * 0.15)
+          .rotationEffect(.degrees(30)).offset(x: -size * 0.12, y: -size * 0.3)
+        Ellipse().stroke(ribbon, lineWidth: size * 0.065)
+          .frame(width: size * 0.27, height: size * 0.15)
+          .rotationEffect(.degrees(-30)).offset(x: size * 0.12, y: -size * 0.3)
+        Circle().fill(ribbon).frame(width: size * 0.14, height: size * 0.14).offset(y: -size * 0.23)
+      }.rotationEffect(.degrees(-12 * lid)).offset(y: -size * 0.24 * CGFloat(lid))
+      Circle().fill(ribbon).frame(width: size * 0.25, height: size * 0.25).offset(y: size * 0.12)
+      Image(systemName: unlocked ? "star.fill" : "lock.fill")
+        .font(.system(size: size * 0.12, weight: .heavy)).foregroundStyle(box)
+        .offset(y: size * 0.12)
+    }.frame(width: size, height: size).accessibilityHidden(true)
+  }
+}
+
 struct TreasureChest: View {
   var unlocked = false
   var size: CGFloat = 64
@@ -261,7 +312,7 @@ struct StreakRewardView: View {
           .font(.headline).foregroundStyle(reward.isStar ? .yellow : SabboStyle.orange)
         ZStack {
           if ceremony && lid > 0 && !reduceMotion { ChestRays(size: 220).opacity(lid) }
-          TreasureChest(unlocked: presentation.revealsMessage, size: presentation.revealsMessage ? 140 : 180, lid: lid)
+          RewardIcon(reward: reward, unlocked: presentation.revealsMessage, size: presentation.revealsMessage ? 140 : 180, lid: lid)
             .rotationEffect(.degrees(wobble))
             .scaleEffect(presentation.access == .earned && !reduceMotion && !revealed ? 0.85 : 1)
         }.frame(height: presentation.revealsMessage ? 200 : 180)

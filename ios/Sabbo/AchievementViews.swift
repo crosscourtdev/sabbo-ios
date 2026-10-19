@@ -31,8 +31,8 @@ struct HomeCounters: View {
   private func counter(_ id: String, value: Int, symbol: String, color: Color, label: String, flame: FlameState = .none) -> some View {
     CounterChip(value: value, symbol: symbol, color: color, stars: id == "stars", flame: flame) { destination = id }
       .accessibilityLabel("\(value) \(label)")
-      .accessibilityValue(flame == .atRisk ? "Lever i dag for å holde rekken" : flame == .lit ? "Levert i dag" : "")
-      .accessibilityHint(id == "stars" ? "Vis stjernekister og prestasjoner" : "Vis rekken og belønningene")
+      .accessibilityValue(flame == .atRisk ? "Lever i dag for å holde streaken" : flame == .lit ? "Levert i dag" : "")
+      .accessibilityHint(id == "stars" ? "Vis stjernegaver og achievements" : "Vis streak og belønningene")
       .accessibilityIdentifier("home-counter-" + id)
   }
 }
@@ -136,7 +136,7 @@ struct RewardCollection: View {
           Label("\(model.ownProgress?.stars.total ?? 0) stjerner", systemImage: "star.fill")
             .font(.system(.largeTitle, design: .rounded, weight: .heavy))
           if let next = StreakReward.starMilestones.first(where: { $0.threshold > (model.ownProgress?.stars.total ?? 0) }) {
-            Text("\(next.threshold - (model.ownProgress?.stars.total ?? 0)) stjerner til neste kiste").foregroundStyle(.secondary)
+            Text("\(next.threshold - (model.ownProgress?.stars.total ?? 0)) stjerner til neste gave").foregroundStyle(.secondary)
           }
           HStack {
             ForEach(StreakReward.starMilestones) { reward in
@@ -145,27 +145,28 @@ struct RewardCollection: View {
                 StreakRewardView(presentation: presentation).onAppear { model.rewardShown(presentation) }
               } label: {
                 VStack(spacing: 8) {
-                  TreasureChest(unlocked: model.rewardValue(reward) >= reward.threshold, size: 56)
+                  RewardIcon(reward: reward, unlocked: model.rewardValue(reward) >= reward.threshold, size: 56)
                   Text("\(reward.threshold) ★").font(.headline).foregroundStyle(.primary)
                 }.frame(maxWidth: .infinity).padding(.vertical, 12)
               }.buttonStyle(.plain).accessibilityIdentifier("stars-reward-\(reward.threshold)")
-                .accessibilityLabel("Stjernekiste, \(reward.threshold) stjerner")
+                .accessibilityLabel("Stjernegave, \(reward.threshold) stjerner")
             }
           }
-          Text("Prestasjoner").font(.system(.title2, design: .rounded, weight: .bold))
+          Label("Achievements", systemImage: "trophy.fill")
+            .font(.system(.title2, design: .rounded, weight: .bold))
           ForEach(model.ownProgress?.achievements ?? []) { item in
             AchievementRow(achievement: item).padding(16)
               .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22))
           }
-          Text("Karakteren gir 1–6 stjerner. Hver prestasjon gir 25 ekstra, én gang. Bare aktivitet etter at prestasjonene ble lansert teller.")
+          Text("Karakteren gir 1–6 stjerner. Hver achievement gir 25 ekstra, én gang. Bare aktivitet etter lanseringen teller.")
             .font(.footnote).foregroundStyle(.secondary)
         } else {
           ProgressPanel()
-          Text("Lever dagsøkten før midnatt for å holde rekken. Opptjente kister beholdes ved en pause.")
+          Text("Lever dagsøkten før midnatt for å holde streaken. Opptjente kister beholdes ved en pause.")
             .font(.subheadline).foregroundStyle(.secondary)
         }
       }.padding(22).frame(maxWidth: 620).frame(maxWidth: .infinity)
-    }.background(Color(.systemGroupedBackground)).navigationTitle(stars ? "Stjerner og prestasjoner" : "Rekken din")
+    }.background(Color(.systemGroupedBackground)).navigationTitle(stars ? "Stjerner og achievements" : "Streak")
       .navigationBarTitleDisplayMode(.inline)
       .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Ferdig") { dismiss() } } }
   }
@@ -186,7 +187,7 @@ struct AchievementCelebration: View {
   var body: some View {
     ForEach(unseen) { item in
       VStack(alignment: .leading, spacing: 12) {
-        Text("Prestasjon låst opp!").font(.caption.bold()).foregroundStyle(Color("AccentColor"))
+        Text("Achievement låst opp!").font(.caption.bold()).foregroundStyle(Color("AccentColor"))
         AchievementRow(achievement: item)
         Button("Herlig!") {
           dismissed.insert(item.id)

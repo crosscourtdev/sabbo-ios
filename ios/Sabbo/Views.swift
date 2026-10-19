@@ -438,9 +438,9 @@ struct SettingsView: View {
         #endif
       } header: { Text("Lyd og vibrasjon") } footer: {
         #if targetEnvironment(macCatalyst)
-        Text("Korte lyder når du leverer, får karakter og åpner kister. De blandes med annen lyd.")
+        Text("Korte lyder når du leverer, får karakter og åpner belønninger. De blandes med annen lyd.")
         #else
-        Text("Korte lyder når du leverer, får karakter og åpner kister. De følger lydløsbryteren og blandes med annen lyd.")
+        Text("Korte lyder når du leverer, får karakter og åpner belønninger. De følger lydløsbryteren og blandes med annen lyd.")
         #endif
       }
       .onChange(of: sound) { _, on in if on { SabboFX.shared.play(.step) } }
@@ -511,7 +511,7 @@ struct AdministrationView: View {
           Task { await model.resetDaily(); resetBusy = false }
         }
       } message: {
-        Text("Du får en ny start på dagens oppgaver. Lever igjen for å få dagens dag i rekken. Tidligere svar beholdes i historikken. Økten til \(ClientProfile.learnerName) påvirkes ikke.")
+        Text("Du får en ny start på dagens oppgaver. Lever igjen for å forlenge streaken i dag. Tidligere svar beholdes i historikken. Økten til \(ClientProfile.learnerName) påvirkes ikke.")
       }
   }
 }
@@ -548,7 +548,7 @@ struct AccountDataView: View {
       }
     }.navigationTitle("Mine data")
       .confirmationDialog(
-        "Slette svarhistorikken, stjernene og rekken din?", isPresented: $deleting,
+        "Slette svarhistorikken, stjernene og streaken din?", isPresented: $deleting,
         titleVisibility: .visible
       ) {
         Button("Slett mine data", role: .destructive) {
@@ -598,7 +598,7 @@ struct SavedDraftView: View {
         Text(StudyText.day(saved.assignment.day)).font(.caption).foregroundStyle(.secondary)
         QuestionPrompt(question: saved.question).font(.title2)
         QuestionMaterials(question: saved.question)
-        Text("Sene svar lagres, men teller ikke med i rekken.").font(
+        Text("Sene svar lagres, men teller ikke med i streaken.").font(
           .footnote
         ).foregroundStyle(.secondary)
         if let completed = model.local.history.first(where: {
