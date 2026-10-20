@@ -118,6 +118,7 @@ extension AppModel {
 
   private func performDraftSync(_ day: Today, account: Session) async {
     let id = day.id, client = draftAPIOverride ?? API(token: account.token)
+    func status(_ value: String) { if local.today?.id == id { draftStatus = value } }
     do {
       // Coalesce edits made during a request; never run overlapping saves for a day.
       for _ in 0..<8 {
@@ -147,19 +148,19 @@ extension AppModel {
         if local.today?.id == id { local.today = fresh }
         reconcileDraft(fresh)
         guard fresh.attempt == nil, var state = local.draftSync?[id] else { return }
-        guard state.conflict == nil else { draftStatus = "Velg svar før levering"; return }
+        guard state.conflict == nil else { status("Velg svar før levering"); return }
         let body = local.drafts[id] ?? ""
-        guard !DraftSync.equal(body, state.base) else { draftStatus = "Synkronisert"; return }
+        guard !DraftSync.equal(body, state.base) else { status("Synkronisert"); return }
         state.write = DraftWrite(revision: state.revision, body: body)
         local.draftSync?[id] = state
         // Persist the exact request before sending, so relaunch can replay its receipt.
         guard persist() else { return }
-        draftStatus = "Lagrer …"
+        status("Lagrer …")
       }
     } catch {
       if session?.token == account.token {
-        draftStatus = (error as? URLError)?.code == .userAuthenticationRequired
-          ? "Lagret på enheten · logg inn for å synkronisere" : "Lagret på enheten · prøver igjen"
+        status((error as? URLError)?.code == .userAuthenticationRequired
+          ? "Lagret på enheten · logg inn for å synkronisere" : "Lagret på enheten · prøver igjen")
       }
     }
   }

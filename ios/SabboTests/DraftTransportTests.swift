@@ -118,6 +118,22 @@ private final class DraftProtocol: URLProtocol, @unchecked Sendable {
     XCTAssertEqual(DraftProtocol.server.revision, 2)
     XCTAssertNil(relaunched.local.draftSync?[day.id]?.conflict)
   }
+  func testOverlappingEditsRequireOnlyTheAffectedAnswerAndPreserveBoth() async throws {
+    let phone = model(), mac = model()
+    let base = DraftSync.encode(["q1":"One", "q2":"Two"])
+    phone.local.drafts[day.id] = base; await phone.syncCurrentDraft(); await mac.syncCurrentDraft()
+    phone.local.drafts[day.id] = DraftSync.encode(["q1":"Phone answer", "q2":"Two"])
+    mac.local.drafts[day.id] = DraftSync.encode(["q1":"Mac answer", "q2":"New second answer"])
+    await mac.syncCurrentDraft(); await phone.syncCurrentDraft()
+    XCTAssertEqual(phone.local.draftSync?[day.id]?.unresolved(local: phone.local.drafts[day.id]!), ["q1"])
+    XCTAssertEqual(DraftSync.parts(phone.local.drafts[day.id]!)["q2"], "New second answer")
+    phone.resolveAnswers(day, choices: ["q1":false])
+    await phone.syncCurrentDraft(); await mac.syncCurrentDraft()
+    XCTAssertEqual(DraftSync.parts(mac.local.drafts[day.id]!), ["q1":"Phone answer", "q2":"New second answer"])
+    XCTAssertTrue(phone.local.draftSync![day.id]!.backups.contains { DraftSync.parts($0)["q1"] == "Mac answer" })
+    XCTAssertTrue(phone.local.draftSync![day.id]!.backups.contains { DraftSync.parts($0)["q1"] == "Phone answer" })
+    XCTAssertNil(phone.local.draftSync?[day.id]?.conflict)
+  }
   func testTwoClientsMergeDifferentQuestionsAndKeepOldDayAcrossMidnight() async throws {
     let phone = model(), mac = model()
     let base = DraftSync.encode(["q1":"One", "q2":"Two"])

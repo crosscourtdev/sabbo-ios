@@ -193,7 +193,7 @@ import UserNotifications
       local.drafts[aid + ".started"] = ISO8601DateFormatter().string(from: Date())
     }
     local.drafts[aid] = value
-    persist()  // synchronous durable write before network/debounce
+    if persist() { draftStatus = "Lagret på enheten" } // durable before network/debounce
     scheduleDraftSync()
   }
   func scheduleDraftSync(day: Today? = nil) {
@@ -432,7 +432,7 @@ import UserNotifications
         if p.mode == "daily", value.domain == "Sabbo", value.code == 422,
            let day: Today = try? await api.get("/assignments/" + p.assignment.id), let accepted = day.attempt {
           var state = local.draftSync?[day.id] ?? DraftSync()
-          state.keep(p.answer); state.conflict = nil
+          state.keep(p.answer); state.conflict = nil; state.conflictKeys = nil; state.write = nil
           local.draftSync = (local.draftSync ?? [:]).merging([day.id: state]) { _, new in new }
           if let i = local.pending.firstIndex(where: { $0.id == p.id }) { local.pending[i].attempt_id = accepted.id }
           persist()
