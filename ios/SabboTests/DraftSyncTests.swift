@@ -2,6 +2,14 @@ import XCTest
 @testable import Sabbo
 
 final class DraftSyncTests: XCTestCase {
+  func testBlankDraftStaysBlankForLegacySingleQuestionSessions() {
+    var state = DraftSync()
+    XCTAssertEqual(state.receive(nil, local: ""), "")
+    XCTAssertEqual(state.receive(Draft(revision: 1, body: "", assisted: 0), local: ""), "")
+    XCTAssertTrue(DraftSync.equal("", "{}"))
+    XCTAssertFalse(AnswerSet.complete(Question(id: "legacy", version: 1, subject_id: "sample", goal_ids: [], prompt: "Explain"), ""))
+  }
+
   func testUneditedDeviceReceivesNewDraft() {
     var state = DraftSync(revision: 1, base: "First")
     XCTAssertEqual(state.receive(Draft(revision: 2, body: "Second", assisted: 0), local: "First"), "Second")
