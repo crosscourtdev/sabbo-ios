@@ -31,6 +31,20 @@
       if let state = ProcessInfo.processInfo.environment["SABBO_RESULT_FIXTURE"] {
         installResultFixture(state)
       }
+      if ProcessInfo.processInfo.environment["SABBO_DRAFT_FIXTURE"] == "1" {
+        let first = Question(id: "q1", version: 1, subject_id: "pome", goal_ids: [], prompt: "Forklar hvordan du undersøker en kilde.")
+        let second = Question(id: "q2", version: 1, subject_id: "pome", goal_ids: [], prompt: "Hva vil du sammenligne?")
+        let question = Question(id: "draft-session", version: 1, subject_id: "pome", goal_ids: [], prompt: "Vurder informasjon.", parts: [first, second])
+        let assignment = Assignment(id: "draft-fixture", day: "2026-10-20", timezone: "Europe/Oslo", question_id: question.id, version: 1)
+        local.today = Today(assignment: assignment, question: question, attempt: nil, draft: nil, streaks: [], server_day: assignment.day)
+        let base = DraftSync.encode(["q1":"Første utkast", "q2":"Et utkast"])
+        let own = DraftSync.encode(["q1":"Jeg undersøker avsenderen.", "q2":"Et utkast"])
+        let other = DraftSync.encode(["q1":"Jeg undersøker avsenderen og metoden.", "q2":"Jeg sammenligner flere uavhengige kilder."])
+        var sync = DraftSync(revision: 1, base: base)
+        local.drafts[assignment.id] = sync.receive(Draft(revision: 2, body: other, assisted: 0), local: own)
+        local.draftSync = [assignment.id: sync]
+        editor = local.drafts[assignment.id]!
+      }
       if let state = ProcessInfo.processInfo.environment["SABBO_BONUS_FIXTURE"] {
         installResultFixture("graded")
         let now = Date(); bonusClock = now

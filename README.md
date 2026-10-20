@@ -67,3 +67,13 @@ exports the original copy and current local file without a network request or
 credentials (base64 preserves even malformed bytes). The recovery copy does not
 prove any particular unsynced answer exists. Explicit account-data deletion also
 removes that account's local recovery copy; updating through TestFlight does not.
+
+Drafts save locally on each edit and synchronize with one save at a time per
+assignment. Each pending write has a durable identifier and base revision. A
+compatible backend must return the original receipt when that identifier is
+retried with the same payload, without replaying it over a newer draft. The
+client acknowledges the receipt before merging the current server version.
+Edits to different questions merge automatically; overlapping changes show a
+per-question choice with both answers retained. Submission opens that choice
+and then returns to the full answer review. `SABBO_DRAFT_FIXTURE=1` exercises
+this flow with synthetic answers in Debug builds.

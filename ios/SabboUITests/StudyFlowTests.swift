@@ -201,3 +201,37 @@ extension ResultFlowTests {
     attachment.name = "Unified session results"; attachment.lifetime = .keepAlways; add(attachment)
   }
 }
+
+
+extension ResultFlowTests {
+  func testSubmitLeadsToQuestionChoiceAndKeepsAutomaticallyMergedAnswer() {
+    let app = XCUIApplication()
+    app.launchEnvironment["SABBO_UI_TEST"] = "1"
+    app.launchEnvironment["SABBO_DRAFT_FIXTURE"] = "1"
+    app.launch()
+    XCTAssertTrue(app.buttons["start-question"].waitForExistence(timeout: 10))
+    app.buttons["start-question"].tap()
+    app.buttons["next-question"].tap()
+    app.buttons["next-question"].tap()
+    let submit = app.buttons["submit-session"]
+    XCTAssertTrue(submit.waitForExistence(timeout: 5))
+    XCTAssertTrue(submit.isEnabled)
+    submit.tap()
+    let choice = app.buttons["draft-choice-q1-remote"]
+    XCTAssertTrue(choice.waitForExistence(timeout: 5))
+    XCTAssertFalse(app.buttons["draft-choice-q2-remote"].exists)
+    XCTAssertFalse(app.buttons["confirm-draft-choices"].isEnabled)
+    let before = XCTAttachment(screenshot: app.screenshot())
+    before.name = "Choose the answer to submit"; before.lifetime = .keepAlways; add(before)
+    choice.tap()
+    app.buttons["confirm-draft-choices"].tap()
+    XCTAssertTrue(submit.waitForExistence(timeout: 5))
+    XCTAssertTrue(app.staticTexts["Jeg undersøker avsenderen og metoden."].exists)
+    XCTAssertTrue(app.staticTexts["Jeg sammenligner flere uavhengige kilder."].exists)
+    XCTAssertTrue(submit.isEnabled)
+    let after = XCTAttachment(screenshot: app.screenshot())
+    after.name = "Review both resolved answers"; after.lifetime = .keepAlways; add(after)
+    submit.tap()
+    XCTAssertTrue(app.buttons["result-done"].waitForExistence(timeout: 5))
+  }
+}

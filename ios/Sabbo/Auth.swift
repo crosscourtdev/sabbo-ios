@@ -92,6 +92,10 @@ struct Session: Codable {
 struct API {
   let base: URL
   var token: String?
+  var transport = URLSession.shared
+  init(base: URL, token: String?, transport: URLSession) {
+    self.base = base; self.token = token; self.transport = transport
+  }
   init(token: String? = nil) {
     guard let raw = Bundle.main.object(forInfoDictionaryKey: "SabboAPIURL") as? String,
       let url = URL(string: raw), url.scheme == "https", url.host != nil
@@ -111,7 +115,7 @@ struct API {
       request.httpBody = try JSONSerialization.data(withJSONObject: body)
       request.setValue("application/json", forHTTPHeaderField: "Content-Type")
     }
-    let (data, response) = try await URLSession.shared.data(for: request)
+    let (data, response) = try await transport.data(for: request)
     guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
     if http.statusCode == 401 { throw URLError(.userAuthenticationRequired) }
     guard (200..<300).contains(http.statusCode) else {

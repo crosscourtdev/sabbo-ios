@@ -226,7 +226,7 @@ struct GoalSessionView: View {
               if answer == nil { Text(model.draftStatus).font(.caption).foregroundStyle(.secondary) }
               Spacer()
               if let state = model.local.draftSync?[day.id], state.conflict != nil || !state.backups.isEmpty {
-                Button(state.conflict != nil ? "Velg utkast" : "Tidligere utkast") { draftVersions = true }
+                Button(state.conflict != nil ? "Velg svar" : "Tidligere svar") { draftVersions = true }
                   .font(.caption.bold())
               }
             }
@@ -257,6 +257,9 @@ struct GoalSessionView: View {
               }.padding(18).background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18))
             }
             Button {
+              if mode == "daily", model.local.draftSync?[day.id]?.conflict != nil {
+                draftVersions = true; return
+              }
               working = true
               Task {
                 if mode == "bonus", let bonusID {
@@ -272,11 +275,12 @@ struct GoalSessionView: View {
                   SabboFX.shared.haptic(.success)
                 }
                 working = false
+                if mode == "daily", model.local.draftSync?[day.id]?.conflict != nil { draftVersions = true }
                 scroll.scrollTo("top")
               }
             } label: {
               HStack { Text("Lever hele økten"); Spacer(); if working { ProgressView() } else { Image(systemName: "checkmark") } }
-            }.buttonStyle(PlayButton()).disabled(working || !AnswerSet.complete(day.question, raw) || model.local.draftSync?[day.id]?.conflict != nil)
+            }.buttonStyle(PlayButton()).disabled(working || !AnswerSet.complete(day.question, raw) )
               .accessibilityIdentifier("submit-session")
           } else if !parts.isEmpty {
             let part = parts[min(index, parts.count - 1)]
@@ -326,7 +330,9 @@ struct GoalSessionView: View {
       }
     }.navigationTitle(answer == nil ? (mode == "bonus" ? "Bonusrunde" : "Dagens økt") : "Resultat").navigationBarTitleDisplayMode(.inline)
       .toolbar { if answer == nil { Button("Lukk", systemImage: "xmark") { save(); dismiss() } } }
-      .sheet(isPresented: $draftVersions) { NavigationStack { DraftVersionsView(day: current) } }
+      .sheet(isPresented: $draftVersions, onDismiss: {
+        if answer == nil { raw = model.local.drafts[draftKey] ?? raw }
+      }) { NavigationStack { DraftVersionsView(day: current) } }
       .onChange(of: model.local.drafts[draftKey]) { _, value in
         if answer == nil, let value, !DraftSync.equal(raw, value) { raw = value }
       }
@@ -348,7 +354,10 @@ struct GoalSessionView: View {
   func save() {
     guard answer == nil else { return }
     if mode == "daily", day.id == model.local.today?.id { model.edit(raw) }
-    else { model.local.drafts[draftKey] = raw; model.persist() }
+    else {
+      model.local.drafts[draftKey] = raw; model.persist()
+      if mode == "daily" { model.scheduleDraftSync(day: day) }
+    }
   }
 }
 
