@@ -27,6 +27,9 @@
             user_id: "peer", name: ClientProfile.ownerName, current: 0, best: 0, completed_today: false,
             week_days: 0, days: []),
         ], server_day: a.day)
+      if ProcessInfo.processInfo.environment["SABBO_UPDATE_FIXTURE"] == "1" {
+        availableRelease = ClientRelease(version: "99.0", build: "999", platform: ClientRelease.currentPlatform, app_id: "123456789")
+      }
       editor = ""
       if let state = ProcessInfo.processInfo.environment["SABBO_RESULT_FIXTURE"] {
         installResultFixture(state)

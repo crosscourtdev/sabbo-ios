@@ -29,6 +29,7 @@ struct SabboRoot: View {
       StreakRewardView(presentation: reward).onAppear { model.rewardShown(reward) }
     }
     .tint(Color("AccentColor"))
+    .task(id: model.session?.token) { await model.checkForUpdate() }
     .task {
       await model.refresh()
       resumeNotification()
@@ -57,6 +58,7 @@ struct SabboRoot: View {
     .onChange(of: model.session?.user_id) { _, _ in model.reward = nil; resumeNotification() }
     .onChange(of: scenePhase) { _, phase in
       if phase == .active {
+        Task { await model.checkForUpdate() }
         Task {
           await model.refresh()
           resumeNotification()
@@ -187,6 +189,7 @@ struct TodayView: View {
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 24) {
+        ClientUpdateNotice()
         if let t = model.local.today {
           HomeCounters(openWardrobe: { cosmetics = true })
           VStack(alignment: .leading, spacing: 20) {
@@ -409,6 +412,11 @@ struct SettingsView: View {
   }
   var body: some View {
     Form {
+      if let release = model.availableRelease, let url = release.testFlightURL {
+        Section("Oppdatering tilgjengelig") {
+          Link("Åpne TestFlight · versjon \(release.version)", destination: url)
+        }
+      }
       Section {
         Toggle("Daglig påminnelse", isOn: reminderBinding(\.reminderEnabled))
         if model.reminderEnabled {

@@ -235,3 +235,21 @@ extension ResultFlowTests {
     XCTAssertTrue(app.buttons["result-done"].waitForExistence(timeout: 5))
   }
 }
+
+extension ResultFlowTests {
+  func testUpdateNoticeCanBeDismissedWithoutBlockingStudy() {
+    let app = XCUIApplication()
+    app.launchEnvironment["SABBO_UI_TEST"] = "1"
+    app.launchEnvironment["SABBO_UPDATE_FIXTURE"] = "1"
+    app.launch()
+    XCTAssertTrue(app.staticTexts["Oppdatering tilgjengelig"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.links["open-testflight"].exists || app.buttons["open-testflight"].exists)
+    let shot = XCTAttachment(screenshot: app.screenshot())
+    shot.name = "Update notice on home"; shot.lifetime = .keepAlways; add(shot)
+    app.buttons["dismiss-update"].tap()
+    XCTAssertFalse(app.staticTexts["Oppdatering tilgjengelig"].exists)
+    XCTAssertTrue(app.buttons["start-question"].exists)
+    app.buttons["start-question"].tap()
+    XCTAssertFalse(app.buttons["dismiss-update"].exists)
+  }
+}
