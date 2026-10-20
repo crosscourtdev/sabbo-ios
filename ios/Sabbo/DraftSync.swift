@@ -22,6 +22,7 @@ struct DraftSync: Codable {
     return ["": body]
   }
   static func encode(_ parts: [String: String]) -> String {
+    if parts.isEmpty { return "" }
     if let plain = parts[""], parts.count == 1 { return plain }
     let encoder = JSONEncoder(); encoder.outputFormatting = .sortedKeys
     return String(data: (try? encoder.encode(parts)) ?? Data("{}".utf8), encoding: .utf8) ?? "{}"
