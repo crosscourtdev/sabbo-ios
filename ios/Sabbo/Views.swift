@@ -63,6 +63,7 @@ struct SabboRoot: View {
         }
       } else {
         model.persist()
+        Task { await model.syncCurrentDraft() }
       }
     }
     .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SabboPush"))) { _ in

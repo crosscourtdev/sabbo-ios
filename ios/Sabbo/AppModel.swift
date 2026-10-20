@@ -107,7 +107,8 @@ import UserNotifications
   private var reminderTaskID: UUID?
   private var saveTask: Task<Void, Never>?
   private var syncing = false
-  var draftSyncing = false
+  var draftWorkers: [String: Task<Void, Never>] = [:]
+  var draftAPIOverride: API?
   @Published var draftStatus = ""
   private var editGeneration = 0
   let login = SignIn()
@@ -192,15 +193,16 @@ import UserNotifications
       local.drafts[aid + ".started"] = ISO8601DateFormatter().string(from: Date())
     }
     local.drafts[aid] = value
-    persist()  // synchronous durable write before network/debounce
+    if persist() { draftStatus = "Lagret på enheten" } // durable before network/debounce
     scheduleDraftSync()
   }
-  func scheduleDraftSync() {
+  func scheduleDraftSync(day: Today? = nil) {
+    guard let target = day ?? local.today else { return }
     saveTask?.cancel()
     saveTask = Task {
       try? await Task.sleep(for: .milliseconds(650))
       guard !Task.isCancelled else { return }
-      await syncCurrentDraft()
+      await syncDraft(target)
     }
   }
   func refresh() async {
@@ -313,9 +315,10 @@ import UserNotifications
     if mode == "daily", local.draftSync?[a.id]?.conflict != nil {
       message = "Velg hvilket utkast du vil levere først."; return nil
     }
-    if mode == "daily", a.id == local.today?.id {
-      await syncCurrentDraft()
-      guard local.draftSync?[a.id]?.conflict == nil, !hasSubmitted,
+    if mode == "daily" {
+      let target = Today(assignment: a, question: q, attempt: nil, draft: nil, streaks: [], server_day: a.day)
+      await syncDraft(target)
+      guard local.draftSync?[a.id]?.conflict == nil, !(local.today?.id == a.id && hasSubmitted),
             DraftSync.equal(text, local.drafts[a.id] ?? text) else {
         message = "Utkastet er oppdatert. Se over svarene før du leverer."; return nil
       }
@@ -429,7 +432,7 @@ import UserNotifications
         if p.mode == "daily", value.domain == "Sabbo", value.code == 422,
            let day: Today = try? await api.get("/assignments/" + p.assignment.id), let accepted = day.attempt {
           var state = local.draftSync?[day.id] ?? DraftSync()
-          state.keep(p.answer); state.conflict = nil
+          state.keep(p.answer); state.conflict = nil; state.conflictKeys = nil; state.write = nil
           local.draftSync = (local.draftSync ?? [:]).merging([day.id: state]) { _, new in new }
           if let i = local.pending.firstIndex(where: { $0.id == p.id }) { local.pending[i].attempt_id = accepted.id }
           persist()
