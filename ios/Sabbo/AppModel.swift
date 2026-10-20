@@ -4,6 +4,9 @@ import UIKit
 import UserNotifications
 
 @MainActor final class AppModel: ObservableObject {
+  @Published var availableRelease: ClientRelease?
+  var lastReleaseCheck = Date.distantPast
+  var checkingRelease = false
   @Published var bonusClock = Date()
   @Published var showBonus = false
   @Published var bonusPresentationID = UUID()
@@ -74,6 +77,7 @@ import UserNotifications
   @Published var session: Session? {
     didSet {
       if oldValue?.token != session?.token {
+        availableRelease = nil; lastReleaseCheck = .distantPast
         reminderTask?.cancel(); reminderTask = nil; reminderTaskID = nil
         reminderRevision = 0; savedReminderRevision = 0
         reminderSaving = false; reminderSaveError = nil
