@@ -158,7 +158,7 @@ struct RewardCollection: View {
             AchievementRow(achievement: item).padding(16)
               .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22))
           }
-          Text("Karakteren gir 1–6 stjerner. Hver achievement gir 25 ekstra, én gang. Bare aktivitet etter lanseringen teller.")
+          Text("Karakteren gir 1–6 stjerner. Nye kosmetiske gjenstander gir én ekstra stjerne. Hver achievement viser sin egen engangsbelønning og hva som kreves.")
             .font(.footnote).foregroundStyle(.secondary)
         } else {
           ProgressPanel()
