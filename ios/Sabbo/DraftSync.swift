@@ -196,7 +196,7 @@ struct DraftVersionsView: View {
       VStack(alignment: .leading, spacing: 20) {
         if !keys.isEmpty {
           Text("Hvilket svar vil du levere?").font(.title2.bold())
-          Text("Begge versjonene beholdes.").font(.subheadline).foregroundStyle(.secondary)
+          Text("Begge versjonene beholdes. Ulik tekst er uthevet i hver versjon.").font(.subheadline).foregroundStyle(.secondary)
           ForEach(keys, id: \.self) { key in
             VStack(alignment: .leading, spacing: 12) {
               Text(title(key)).font(.headline)
@@ -236,6 +236,16 @@ struct DraftVersionsView: View {
     guard let index = day.question.parts?.firstIndex(where: { $0.id == key }) else { return "Ditt svar" }
     return "Oppgave \(index + 1)"
   }
+  private func highlighted(_ text: String, comparedTo other: String) -> AttributedString {
+    var value = AttributedString(text.isEmpty ? "Tomt svar" : text)
+    if let range = StudyPresentation.changedRange(text, comparedTo: other),
+       let start = AttributedString.Index(range.lowerBound, within: value),
+       let end = AttributedString.Index(range.upperBound, within: value) {
+      value[start..<end].font = .body.bold()
+      value[start..<end].backgroundColor = .accentColor.opacity(0.12)
+    }
+    return value
+  }
   private func option(_ title: String, key: String, other: Bool, body: String) -> some View {
     Button {
       choices[key] = other
@@ -245,7 +255,7 @@ struct DraftVersionsView: View {
           Image(systemName: choices[key] == other ? "checkmark.circle.fill" : "circle")
           Text(title).font(.headline)
         }
-        Text(body.isEmpty ? "Tomt svar" : body).font(.body).multilineTextAlignment(.leading)
+        Text(highlighted(body, comparedTo: DraftSync.parts(other ? local : state.conflict ?? "")[key] ?? "")).font(.body).multilineTextAlignment(.leading)
       }.foregroundStyle(.primary).frame(maxWidth: .infinity, alignment: .leading).padding(16)
         .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(choices[key] == other ? Color.accentColor : .clear, lineWidth: 2))

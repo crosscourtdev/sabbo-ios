@@ -117,6 +117,7 @@ struct EvaluationCard: View {
   @EnvironmentObject var model: AppModel
   let attemptID: String
   var question: Question? = nil
+  var showsCriteria = true
   @Environment(\.scenePhase) private var scenePhase
   @State private var retry = 0
   @State private var loadError: String?
@@ -132,38 +133,11 @@ struct EvaluationCard: View {
         if let result = evaluation.result {
           VStack(alignment: .leading, spacing: 18) {
             if let grade = result.grade {
+              Text("Veiledende KI-vurdering").font(.caption).foregroundStyle(.secondary)
               GradeHeadline(grade: grade, key: "grade:" + attemptID, celebrate: celebrates).id(attemptID + String(grade))
             }
             if model.answersLocked(attemptID: attemptID) || question.map({ model.answersLocked($0) }) == true { BonusAnswersHidden() } else {
-            Text(result.reason).lineLimit(3)
-            if !result.improvement.isEmpty {
-              VStack(alignment: .leading, spacing: 6) {
-                Label("Neste steg", systemImage: "arrow.up.right").font(.subheadline.bold())
-                Text(result.improvement).font(.subheadline).lineLimit(3)
-              }.frame(maxWidth: .infinity, alignment: .leading).padding(14)
-                .background(Color("AccentColor").opacity(0.07), in: RoundedRectangle(cornerRadius: 14))
-            }
-            DisclosureGroup("Vurderingsdetaljer") {
-              VStack(alignment: .leading, spacing: 16) {
-                Text(result.reason).fixedSize(horizontal: false, vertical: true)
-                if !result.improvement.isEmpty {
-                  Text(result.improvement).fixedSize(horizontal: false, vertical: true)
-                }
-                if !result.strengths.isEmpty {
-                  VStack(alignment: .leading, spacing: 6) {
-                    Text("Dette fikk du til").font(.subheadline.bold())
-                    Text(result.strengths)
-                  }
-                }
-                ForEach(result.criteria) { c in
-                  VStack(alignment: .leading, spacing: 6) {
-                    Text(c.comment)
-                    if !c.evidence.isEmpty { Text("«" + c.evidence + "»").italic().foregroundStyle(.secondary) }
-                  }
-                }
-                Text("Veiledende KI-vurdering, ikke en eksamenskarakter.").font(.caption).foregroundStyle(.secondary)
-              }.padding(.top, 12)
-            }.font(.subheadline)
+            AssessmentSummary(result: result, question: question, showsCriteria: showsCriteria)
             }
           }
         } else if ["queued", "processing"].contains(evaluation.status) {

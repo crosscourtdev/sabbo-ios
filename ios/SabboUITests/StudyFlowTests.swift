@@ -44,7 +44,7 @@ final class ResultFlowTests: XCTestCase {
   func testResultDetailsAreOptionalAndDoneDoesNotOpenRewards() {
     let app = open("graded")
     XCTAssertTrue(app.staticTexts["Veiledende karakter 5 av 6"].exists)
-    XCTAssertFalse(app.staticTexts["Jeg undersøker utvalget og metoden."].exists)
+    XCTAssertFalse(app.buttons["Svar og eksempelsvar"].exists)
     app.buttons["result-done"].tap()
     XCTAssertTrue(app.buttons["start-question"].waitForExistence(timeout: 5))
     XCTAssertFalse(app.buttons["close-streak-reward"].exists)
@@ -251,5 +251,89 @@ extension ResultFlowTests {
     XCTAssertTrue(app.buttons["start-question"].exists)
     app.buttons["start-question"].tap()
     XCTAssertFalse(app.buttons["dismiss-update"].exists)
+  }
+}
+
+
+extension ResultFlowTests {
+  private func presentation(_ mode: String, large: Bool = false) -> XCUIApplication {
+    let app = XCUIApplication()
+    app.launchEnvironment["SABBO_UI_TEST"] = "1"
+    app.launchEnvironment["SABBO_PRESENTATION_FIXTURE"] = mode
+    if large { app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"] }
+    app.launch()
+    XCTAssertTrue(app.buttons["start-question"].waitForExistence(timeout: 10))
+    return app
+  }
+  private func reveal(_ element: XCUIElement, app: XCUIApplication) {
+    for _ in 0..<12 {
+      if element.isHittable { return }
+      app.swipeUp()
+    }
+  }
+  private func evidence(_ app: XCUIApplication, _ name: String) {
+    let attachment = XCTAttachment(screenshot: app.screenshot())
+    attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
+  }
+  func testLongAnswersCompareAtTheSameQuestionAndProtectLockedPeers() {
+    for mode in ["reading", "locked"] {
+      let app = presentation(mode)
+      #if targetEnvironment(macCatalyst)
+      app.staticTexts["Sammen"].firstMatch.tap()
+      #else
+      app.tabBars.buttons["Sammen"].tap()
+      #endif
+      let day = app.buttons["timeline-day-presentation-day"]
+      XCTAssertTrue(day.waitForExistence(timeout: 5))
+      evidence(app, "Searchable shared timeline " + mode)
+      day.tap()
+      let toggle = app.switches["compare-answers"]
+      XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+      toggle.tap()
+      let next = app.buttons["Neste oppgave"]
+      reveal(next, app: app); next.tap()
+      XCTAssertTrue(app.staticTexts["Oppgave 2"].exists)
+      evidence(app, "Question comparison " + mode)
+      if mode == "locked" {
+        XCTAssertFalse(app.staticTexts["Jeg sammenligner utvalgene."].exists)
+      } else {
+        reveal(app.staticTexts["Jeg sammenligner utvalgene."], app: app)
+        XCTAssertTrue(app.staticTexts["Jeg sammenligner utvalgene."].exists)
+        evidence(app, "Both answers and criteria")
+      }
+      app.terminate()
+    }
+  }
+  func testWritingResumesQuestionAndKeepsKeyboardNavigationAvailable() {
+    let app = presentation("writing")
+    app.buttons["start-question"].tap()
+    XCTAssertTrue(app.staticTexts["Oppgave 2 av 2"].waitForExistence(timeout: 5))
+    XCTAssertFalse(app.buttons["next-question"].isEnabled)
+    let editor = app.textViews["answer-editor"]
+    reveal(editor, app: app); editor.tap(); editor.typeText("Jeg sammenligner to forklaringer.")
+    XCTAssertTrue(app.buttons["next-question"].isHittable)
+    evidence(app, "Writing with keyboard navigation")
+    app.buttons["Lukk"].tap()
+    app.buttons["start-question"].tap()
+    XCTAssertTrue(app.staticTexts["Oppgave 2 av 2"].waitForExistence(timeout: 5))
+    reveal(editor, app: app)
+    XCTAssertEqual(editor.value as? String, "Jeg sammenligner to forklaringer.")
+    app.buttons["next-question"].tap()
+    reveal(app.buttons["submit-session"], app: app)
+    XCTAssertTrue(app.buttons["submit-session"].isEnabled)
+    evidence(app, "Long answer final review")
+  }
+  func testLargeTextShowsUntruncatedNextStepAndCriterionLabels() {
+    let app = presentation("reading", large: true)
+    app.buttons["start-question"].tap()
+    let advice = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Beskriv hvilke opplysninger")).firstMatch
+    reveal(advice, app: app)
+    XCTAssertTrue(advice.label.contains("mulige forklaringer."))
+    evidence(app, "Large text full next step")
+    let criterion = app.staticTexts["Sammenligne kildenes metode og avsender"]
+    reveal(criterion, app: app)
+    XCTAssertTrue(criterion.exists)
+    XCTAssertTrue(app.staticTexts["Godt oppfylt"].exists)
+    evidence(app, "Large text named criterion")
   }
 }
