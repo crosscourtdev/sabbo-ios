@@ -313,15 +313,20 @@ extension ResultFlowTests {
     let next = app.buttons["Neste oppgave"]
     reveal(next, app: app); next.tap()
     XCTAssertTrue(app.staticTexts["Oppgave 2"].exists)
-    for _ in 0..<8 { activeScroll(app).swipeDown() }
     let person = app.segmentedControls["result-person"]
+    for _ in 0..<8 {
+      if person.buttons.element(boundBy: 1).isHittable { break }
+      activeScroll(app).swipeDown()
+    }
     person.buttons.element(boundBy: 1).tap()
     XCTAssertTrue(app.staticTexts["Oppgave 2"].exists)
     app.segmentedControls["result-stage"].buttons["Bonusrunde"].tap()
-    XCTAssertTrue(app.staticTexts["Ingen bonusbesvarelse fra denne personen ennå."].exists)
+    XCTAssertTrue(app.staticTexts["Ingen bonusbesvarelse fra denne personen ennå."].waitForExistence(timeout: 5))
+    evidence(app, "Peer bonus empty state")
     person.buttons["Meg"].tap()
     XCTAssertTrue(app.segmentedControls["result-stage"].buttons["Bonusrunde"].isSelected)
     XCTAssertTrue(app.staticTexts["Oppgave 2"].exists)
+    evidence(app, "Person switch retains question and bonus round")
   }
   func testWritingResumesQuestionAndKeepsKeyboardNavigationAvailable() {
     let app = presentation("writing")
