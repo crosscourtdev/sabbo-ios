@@ -63,6 +63,52 @@
           local.history.append(HistoryItem(id: id, answer: daily.answer, question: daily.question, assignment_id: daily.assignment_id, day: daily.day, mode: "bonus", assessment: "completed", assisted: 0, submitted_at: id == "bonus-first" ? "2026-10-16T15:00:00Z" : "2026-10-16T15:10:00Z", revisions: [], evaluations: [evaluation], receipt_status: "practice"))
         }
       }
+      if let mode = ProcessInfo.processInfo.environment["SABBO_PRESENTATION_FIXTURE"] { installPresentationFixture(mode) }
+    }
+    func presentationFixture(_ assignmentID: String) -> TimelineDay? {
+      guard testing, let mode = ProcessInfo.processInfo.environment["SABBO_PRESENTATION_FIXTURE"], mode != "writing",
+        let today = local.today, today.id == assignmentID, let own = local.history.first else { return nil }
+      let peerResult = Evaluation(status: "complete", result: GradeResult(status: "graded", grade: 4,
+        reason: "Et annet perspektiv med gode eksempler.", strengths: "Tydelig sammenligning.", improvement: "Undersøk også begrensningene.",
+        criteria: [CriterionResult(criterion_id: "presentation-2.c1", attainment: "partial", evidence: "Jeg sammenligner utvalgene.", comment: "Forklar hva forskjellen betyr.")]))
+      let peer = HistoryItem(id: "presentation-peer", answer: AnswerSet.encode(["presentation-1": "Jeg starter med å undersøke hvem som står bak kilden.", "presentation-2": "Jeg sammenligner utvalgene."]), question: today.question,
+        assignment_id: assignmentID, day: own.day, mode: "daily", assessment: "completed", assisted: 0,
+        submitted_at: own.submitted_at, revisions: [], evaluations: [peerResult], answers_locked: mode == "locked")
+      return TimelineDay(assignment: today.assignment, question: today.question,
+        people: [TimelinePerson(user_id: "uitest", name: ClientProfile.learnerName, attempts: local.history),
+                 TimelinePerson(user_id: "peer", name: ClientProfile.ownerName, attempts: [peer])])
+    }
+    private func installPresentationFixture(_ mode: String) {
+      installResultFixture("graded")
+      let first = Question(id: "presentation-1", version: 1, subject_id: "pome", goal_ids: [],
+        prompt: "Hvilken kilde gir best grunnlag for å undersøke om en ny leseordning hjelper elever? Sammenlign metode og avsender, og forklar hva du fortsatt trenger å vite.",
+        materials: [QuestionMaterial(title: "To kilder", body: "A, elevprosjekt: 80 frivillige leste daglig og fortalte at de husket mer. Deltakerne valgte selv om de ville være med. B, reklame: En butikk lover bedre hukommelse etter kjøp av en leselampe. Ingen metode eller sammenligningsgruppe er oppgitt.")],
+        expectations: ["Sammenligne kildenes metode og avsender"], title: "Undersøk kildene", example_answer: "Jeg undersøker både metoden og hvem som deltok.")
+      let second = Question(id: "presentation-2", version: 1, subject_id: "pome", goal_ids: [],
+        prompt: "Hvordan ville du undersøkt to mulige forklaringer på resultatet? Beskriv hva som kunne styrket eller svekket hver forklaring.",
+        expectations: ["Prøve alternative forklaringer"], title: "Undersøk kildene", example_answer: "Jeg sammenligner grupper med ulik lesevane.")
+      let q = Question(id: "presentation", version: 1, subject_id: "pome", goal_ids: [], prompt: "Undersøke informasjon og alternative forklaringer.", parts: [first, second], title: "Undersøk kildene")
+      let a = Assignment(id: "presentation-day", day: "2026-10-20", timezone: "Europe/Oslo", question_id: q.id, version: 1)
+      let longAnswer = "Jeg undersøker hvem som har laget kilden og hvordan deltakerne ble valgt. Et stort utvalg er ikke nødvendigvis representativt.\n\nElevene meldte seg frivillig, så de kan ha vært mer motiverte enn andre elever. Jeg ville sammenlignet med en gruppe som ikke endret lesevanene sine, og undersøkt om begge gruppene fikk samme test."
+      let answer = AnswerSet.encode([first.id: longAnswer, second.id: "Jeg sammenligner to forklaringer og undersøker forskjellene mellom gruppene."])
+      let result = Evaluation(status: "complete", result: GradeResult(status: "graded", grade: 5,
+        reason: "Du skiller mellom det kilden viser og det som fortsatt er usikkert. Begrunnelsen knytter utvalg og metode til konklusjonen, og viser hvordan en sammenligningsgruppe kan bidra til en bedre undersøkelse.",
+        strengths: "Du forklarer hvorfor frivillige deltakere kan skille seg fra andre elever.",
+        improvement: "Beskriv hvilke opplysninger du vil samle inn om begge gruppene før undersøkelsen starter. Forklar deretter hvordan du vil bruke disse opplysningene til å skille mellom lesetid, motivasjon og tidligere erfaring som mulige forklaringer.",
+        criteria: [CriterionResult(criterion_id: first.id + ".c1", attainment: "strong", evidence: "Et stort utvalg er ikke nødvendigvis representativt.", comment: "Du vurderer utvalg og metode konkret."),
+                   CriterionResult(criterion_id: second.id + ".c1", attainment: "met", evidence: "Jeg sammenligner to forklaringer", comment: "Du foreslår en relevant sammenligning.")]))
+      let item = HistoryItem(id: "presentation-own", answer: answer, question: q, assignment_id: a.id, day: a.day, mode: "daily", assessment: "completed", assisted: 0, submitted_at: "2026-10-20T10:00:00Z", revisions: [], evaluations: [result])
+      let bonus = HistoryItem(id: "presentation-bonus", answer: answer, question: q, assignment_id: a.id, day: a.day, mode: "bonus", assessment: "completed", assisted: 0, submitted_at: "2026-10-20T10:10:00Z", revisions: [], evaluations: [result], receipt_status: "practice")
+      local.history = mode == "writing" ? [] : [item, bonus]
+      evaluations[bonus.id] = result
+      evaluations[item.id] = result
+      local.bonus = nil
+      local.today = Today(assignment: a, question: q, attempt: mode == "writing" ? nil : Attempt(id: item.id, user_id: "uitest", assignment_id: a.id, answer: answer, assessment: "completed", completed_at: item.submitted_at, assisted: 0), draft: nil,
+        streaks: local.today!.streaks + [Streak(user_id: "peer", name: ClientProfile.ownerName, current: 2, best: 2, completed_today: true, week_days: 2, days: [])], server_day: a.day)
+      if let peer = local.today?.streaks.last {
+        local.progress = PairProgress(people: (local.progress?.people ?? []) + [PersonProgress(streak: peer, stars: Stars(total: 40, epoch: "presentation", awards: []), fire_attempt_id: nil)])
+      }
+      local.drafts = mode == "writing" ? [a.id: AnswerSet.encode([first.id: longAnswer])] : [:]
     }
     private func installResultFixture(_ state: String) {
       let part = Question(id: "fixture-part", version: 1, subject_id: "pome", goal_ids: ["fixture"], prompt: "Hvordan undersøker du en kilde?", title: "Kildekritikk", example_answer: "Undersøk avsender og metode.")
@@ -90,5 +136,6 @@
   extension AppModel {
     var testing: Bool { false }
     func installTestFixture() {}
+    func presentationFixture(_ assignmentID: String) -> TimelineDay? { nil }
   }
 #endif

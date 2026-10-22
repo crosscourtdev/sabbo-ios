@@ -72,53 +72,34 @@ struct StudyVisual: View {
   }
 }
 
-/// The copy link is part of the text flow, immediately after the question.
+/// Keep the exercise readable and make the voice-practice action explicit.
 struct QuestionPrompt: View {
   @EnvironmentObject var model: AppModel
   let question: Question
   @State private var copyID: UUID?
-  private let copyURL = URL(string: "sabbo-copy-question://copy")!
   private var allowsCopy: Bool { model.session?.user_id != ClientProfile.learnerID || question.subject_id != "reli" }
-  private var prompt: AttributedString {
-    var text = AttributedString(question.displayPrompt.trimmingCharacters(in: .whitespacesAndNewlines))
-    if allowsCopy {
-      // Keep the icon beside the final word when the paragraph wraps.
-      var icon = AttributedString(copyID == nil ? "\u{00a0}⧉" : "\u{00a0}✓")
-      icon.link = copyURL
-      icon.foregroundColor = .accentColor
-      text.append(icon)
-    }
-    return text
-  }
   var body: some View {
-    Group {
+    VStack(alignment: .leading, spacing: 8) {
+      Text(question.displayPrompt).fixedSize(horizontal: false, vertical: true)
+        .accessibilityIdentifier("question-prompt-" + question.id)
       if allowsCopy {
-        Text(prompt)
-          .environment(\.openURL, OpenURLAction { url in
-            guard url == copyURL else { return .systemAction }
-            copyQuestion()
-            return .handled
-          })
-          .accessibilityAction(named: Text("Kopier oppgaven")) { copyQuestion() }
-          .accessibilityHint("Kopier oppgaven med instruksen for talemodus.")
-      } else {
-        Text(question.displayPrompt)
+        Button {
+          UIPasteboard.general.string = question.voicePracticePrompt
+          copyID = UUID()
+          UIAccessibility.post(notification: .announcement, argument: "Oppgaven og instruksen for talemodus er kopiert")
+        } label: {
+          Label(copyID == nil ? "Kopier til talemodus" : "Kopiert", systemImage: copyID == nil ? "doc.on.doc" : "checkmark")
+            .font(.subheadline).frame(minHeight: 44)
+        }.buttonStyle(.borderless)
+          .accessibilityHint("Kopierer oppgaven, materialet og instruksen for muntlig øving.")
       }
-    }
-    .accessibilityIdentifier("question-prompt-" + question.id)
-    .onChange(of: question.id) { _, _ in copyID = nil }
-    .onChange(of: model.session?.user_id) { _, _ in copyID = nil }
-    .task(id: copyID) {
-      guard copyID != nil else { return }
-      do { try await Task.sleep(for: .seconds(2)) } catch { return }
-      copyID = nil
-    }
-  }
-  private func copyQuestion() {
-    guard allowsCopy else { return }
-    UIPasteboard.general.string = question.voicePracticePrompt
-    copyID = UUID()
-    UIAccessibility.post(notification: .announcement, argument: "Oppgaven er kopiert")
+    }.onChange(of: question.id) { _, _ in copyID = nil }
+      .onChange(of: model.session?.user_id) { _, _ in copyID = nil }
+      .task(id: copyID) {
+        guard copyID != nil else { return }
+        do { try await Task.sleep(for: .seconds(2)) } catch { return }
+        copyID = nil
+      }
   }
 }
 
@@ -132,7 +113,7 @@ struct AnswerReview: View {
     else if let parts = question.parts {
       ForEach(Array(parts.enumerated()), id: \.element.id) { index, part in
         VStack(alignment: .leading, spacing: 8) {
-          Text("Oppgave \(index + 1) · \(part.title ?? "")").font(.headline)
+          Text("Oppgave \(index + 1)").font(.headline)
           QuestionPrompt(question: part).font(.subheadline).foregroundStyle(.secondary)
           Text(values[part.id] ?? "").textSelection(.enabled)
         }.frame(maxWidth: .infinity, alignment: .leading).padding(18)
@@ -142,54 +123,62 @@ struct AnswerReview: View {
   }
 }
 
-// Each question keeps the learner's answer beside the example, one tap away.
+// Question selection is owned by the day, so switching people retains context.
 struct ResultAnswersView: View {
   @EnvironmentObject var model: AppModel
   let question: Question
   let answer: String
   var feedback: Feedback? = nil
   var answerLabel = "Ditt svar"
+  var result: GradeResult? = nil
+  @Binding var selection: Int
   var body: some View {
-    let values = AnswerSet.decode(answer)
     if model.answersLocked(question) { BonusAnswersHidden() } else {
-    ForEach(Array((question.parts ?? [question]).enumerated()), id: \.element.id) { index, part in
-      DisclosureGroup {
-        VStack(alignment: .leading, spacing: 16) {
-          StudyVisual(question: part, maximumHeight: 150)
-          QuestionPrompt(question: part).font(.subheadline).foregroundStyle(.secondary)
-          if !(part.materials ?? []).isEmpty {
-            DisclosureGroup("Oppgavemateriale") { QuestionMaterials(question: part, showExpectations: false) }
+      let parts = question.parts ?? [question]
+      if !parts.isEmpty {
+        let index = min(selection, parts.count - 1)
+        let part = parts[index]
+        VStack(alignment: .leading, spacing: 18) {
+          QuestionNavigator(parts: parts, selection: $selection)
+          Text("Oppgave \(index + 1)").font(.title3.bold())
+          QuestionPrompt(question: part).font(.body)
+          QuestionMaterials(question: part, showExpectations: false)
+          AnswerAssessment(question: question, part: part, answer: answer, label: answerLabel,
+            result: result, feedback: feedback)
+          if let example = question.parts == nil ? feedback?.example_answer : feedback?.parts?.first(where: { $0.id == part.id })?.example_answer,
+             !example.isEmpty {
+            DisclosureGroup("Eksempelsvar") { Text(example).textSelection(.enabled).padding(.top, 8) }
           }
-          VStack(alignment: .leading, spacing: 6) {
-            Text(answerLabel).font(.subheadline.bold())
-            Text(question.parts == nil ? answer : values[part.id] ?? "").textSelection(.enabled)
-          }
-          if let example = example(for: part), !example.isEmpty {
-            Divider()
-            VStack(alignment: .leading, spacing: 6) {
-              Text("Eksempelsvar").font(.subheadline.bold()).foregroundStyle(Color("AccentColor"))
-              Text(example).textSelection(.enabled)
-            }
-          }
-        }.frame(maxWidth: .infinity, alignment: .leading).padding(.top, 12)
-      } label: {
-        VStack(alignment: .leading, spacing: 4) {
-          Text("Oppgave \(index + 1)").font(.headline)
-          if let title = part.title, !title.isEmpty {
-            Text(title).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
-          }
-        }.padding(.vertical, 4)
+          SourceLinks(question: part)
+        }.padding(18).frame(maxWidth: .infinity, alignment: .leading)
+          .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18))
+          .accessibilityIdentifier("result-question-\(index + 1)")
       }
-      .padding(16)
-      .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18))
-      .accessibilityIdentifier("result-question-\(index + 1)")
     }
   }
-  }
-  private func example(for part: Question) -> String? {
-    guard let feedback else { return nil }
-    if question.parts == nil { return feedback.example_answer }
-    return feedback.parts?.first(where: { $0.id == part.id })?.example_answer
+}
+
+struct AnswerAssessment: View {
+  let question: Question
+  let part: Question
+  let answer: String
+  let label: String
+  var result: GradeResult?
+  var feedback: Feedback?
+  var body: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      Text(label).font(.headline)
+      let value = question.parts == nil ? answer : AnswerSet.decode(answer)[part.id] ?? ""
+      Text(value.isEmpty ? "Ingen svartekst tilgjengelig." : value).textSelection(.enabled)
+      let criteria = (result?.criteria ?? []).filter { question.parts == nil || StudyPresentation.belongs($0, to: part) }
+      if !criteria.isEmpty {
+        Divider()
+        Text("Vurdering av denne oppgaven").font(.subheadline.bold())
+        ForEach(criteria) { criterion in
+          CriterionFeedback(criterion: criterion, part: feedback?.parts?.first(where: { $0.id == part.id }) ?? part)
+        }
+      }
+    }.frame(maxWidth: .infinity, alignment: .topLeading)
   }
 }
 
@@ -289,15 +278,29 @@ struct GoalSessionView: View {
                 Text("Oppgave \(index + 1) av \(parts.count)").contentTransition(.numericText(value: Double(index)))
                 Spacer(); Text(StudyText.subject(day.question.subject_id))
               }.font(.subheadline.weight(.semibold))
-              ProgressView(value: Double(index), total: Double(parts.count)).accessibilityLabel("Øktens fremdrift")
+              let completed = parts.filter { !(AnswerSet.decode(raw)[$0.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
+              ProgressView(value: Double(completed), total: Double(parts.count)).accessibilityLabel("\(completed) av \(parts.count) oppgaver har svar")
+              DisclosureGroup("Oppgaveoversikt · \(completed) av \(parts.count) har svar") {
+                ForEach(Array(parts.enumerated()), id: \.element.id) { i, item in
+                  Button {
+                    endEditing(); advance { index = i }; scroll.scrollTo("top")
+                  } label: {
+                    HStack(alignment: .top) {
+                      Image(systemName: (AnswerSet.decode(raw)[item.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "circle" : "checkmark.circle.fill")
+                      Text("\(i + 1). " + item.displayPrompt).multilineTextAlignment(.leading)
+                    }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                  }.accessibilityAddTraits(i == index ? .isSelected : [])
+                }
+              }
               DisclosureGroup("Dagens kompetansemål") { Text(day.question.prompt).font(.subheadline).padding(.top, 8) }
             }
             // Overlapping parts cross-fade in place instead of pushing the layout around.
             ZStack(alignment: .topLeading) {
               VStack(alignment: .leading, spacing: 20) {
-                StudyVisual(question: part, assignmentID: day.assignment.id, recordsOutfit: mode == "daily")
-                QuestionPrompt(question: part).font(.system(.title2, design: .rounded, weight: .bold)).fixedSize(horizontal: false, vertical: true)
-                QuestionMaterials(question: part)
+                Text("Oppgave \(index + 1)").font(.system(.title2, design: .rounded, weight: .bold))
+                QuestionPrompt(question: part).font(.body)
+                StudyVisual(question: part, maximumHeight: 140, assignmentID: day.assignment.id, recordsOutfit: mode == "daily")
+                QuestionMaterials(question: part, showExpectations: false)
                 Text("Ditt svar").font(.headline)
                 AnswerEditor(text: Binding(get: { AnswerSet.decode(raw)[part.id] ?? "" }, set: { value in
                   var values = AnswerSet.decode(raw); values[part.id] = value; raw = AnswerSet.encode(values); save()
@@ -306,20 +309,29 @@ struct GoalSessionView: View {
               }.id(part.id)
                 .transition(reduceMotion ? .opacity : .asymmetric(insertion: .opacity.combined(with: .offset(y: 18)), removal: .opacity))
             }
+            QuestionExpectations(question: part)
+            SourceLinks(question: part)
+          }
+        }.padding(22).frame(maxWidth: 620).frame(maxWidth: .infinity)
+      }.scrollDismissesKeyboard(.interactively).background(Color(.systemGroupedBackground))
+        .safeAreaInset(edge: .bottom) {
+          if answer == nil, !reviewing, !parts.isEmpty {
+            let part = parts[min(index, parts.count - 1)]
             HStack {
-              if index > 0 { Button("Tilbake") { advance { index -= 1 }; scroll.scrollTo("top") }.frame(minHeight: 44) }
+              if index > 0 { Button("Tilbake") { endEditing(); advance { index -= 1 }; scroll.scrollTo("top") }.frame(minHeight: 44) }
               Button(index + 1 == parts.count ? "Se over svarene" : "Neste oppgave") {
                 SabboFX.shared.play(.step)
                 SabboFX.shared.haptic(.step)
-                advance { if index + 1 == parts.count { reviewing = true } else { index += 1 } }
+                endEditing(); advance { if index + 1 == parts.count { reviewing = true } else { index += 1 } }
                 scroll.scrollTo("top")
               }.buttonStyle(PlayButton())
                 .disabled((AnswerSet.decode(raw)[part.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .accessibilityIdentifier("next-question")
             }
+              .padding(.horizontal, 22).padding(.vertical, 10)
+              .frame(maxWidth: 620).frame(maxWidth: .infinity).background(.regularMaterial)
           }
-        }.padding(22).frame(maxWidth: 620).frame(maxWidth: .infinity)
-      }.scrollDismissesKeyboard(.interactively).background(Color(.systemGroupedBackground))
+        }
     }.safeAreaInset(edge: .bottom) {
       if answer != nil {
         Button("Ferdig") { dismiss() }.buttonStyle(PlayButton())
@@ -333,20 +345,30 @@ struct GoalSessionView: View {
       .sheet(isPresented: $draftVersions, onDismiss: {
         if answer == nil { raw = model.local.drafts[draftKey] ?? raw }
       }) { NavigationStack { DraftVersionsView(day: current) } }
-      .onChange(of: model.local.drafts[draftKey]) { _, value in
-        if answer == nil, let value, !DraftSync.equal(raw, value) { raw = value }
+      .onChange(of: model.local.drafts[draftKey]) { _, _ in
+        // A render can observe an earlier keystroke after another edit was saved.
+        // Read the current draft so that our own save notifications cannot rewind typing.
+        if answer == nil, let value = model.local.drafts[draftKey], !DraftSync.equal(raw, value) { raw = value }
+      }
+      .onChange(of: index) { _, value in
+        guard parts.indices.contains(value), answer == nil else { return }
+        if model.local.editorPositions == nil { model.local.editorPositions = [:] }
+        model.local.editorPositions?[draftKey] = parts[value].id; model.persist()
       }
       .onAppear { restoreSession() }
       .onChange(of: day.id) { _, _ in restoreSession(resetDelivery: true) }
   }
   private func restoreSession(resetDelivery: Bool = false) {
     raw = AnswerSet.scoped(model.local.drafts[draftKey] ?? (mode == "bonus" ? nil : current.draft?.body) ?? "{}", to: day.question)
+    index = StudyPresentation.resumeIndex(parts: parts, saved: model.local.editorPositions?[draftKey], answer: raw)
     if resetDelivery {
-      index = 0
       reviewing = false
       delivered = nil
       deliveredID = nil
     }
+  }
+  private func endEditing() {
+    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
   }
   private func advance(_ change: () -> Void) {
     withAnimation(reduceMotion ? .easeInOut(duration: 0.15) : .snappy(duration: 0.32), change)
@@ -431,24 +453,27 @@ struct QuestionMaterials: View {
       ForEach(Array((question.materials ?? []).enumerated()), id: \.offset) { _, material in
         VStack(alignment: .leading, spacing: 8) {
           Label(material.title, systemImage: "doc.text").font(.subheadline.bold())
-          Text(material.body).font(.body).fixedSize(horizontal: false, vertical: true)
+          ForEach(Array(StudyPresentation.paragraphs(material.body).enumerated()), id: \.offset) { _, paragraph in
+            Text(paragraph).font(.body).fixedSize(horizontal: false, vertical: true).padding(.bottom, 4)
+          }
         }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
           .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
       }
-      if showExpectations, let expectations = question.expectations, !expectations.isEmpty {
-        DisclosureGroup("Dette vurderes") {
-          ForEach(Array(expectations.enumerated()), id: \.offset) { _, expectation in
-            Text("• " + expectation).font(.subheadline).frame(maxWidth: .infinity, alignment: .leading).padding(.top, 4)
-          }
-        }
+      if showExpectations {
+        QuestionExpectations(question: question)
+        SourceLinks(question: question)
       }
-      if showExpectations, let sources = question.sources, !sources.isEmpty {
-        DisclosureGroup("Kilder") {
-          ForEach(sources, id: \.url) { source in
-            if let url = URL(string: source.url) {
-              Link(source.title ?? url.host ?? "Åpne kilde", destination: url).font(.subheadline).padding(.top, 4)
-            }
-          }
+    }
+  }
+}
+
+struct QuestionExpectations: View {
+  let question: Question
+  var body: some View {
+    if let expectations = question.expectations, !expectations.isEmpty {
+      DisclosureGroup("Dette vurderes") {
+        ForEach(Array(expectations.enumerated()), id: \.offset) { _, expectation in
+          Text("• " + expectation).font(.subheadline).frame(maxWidth: .infinity, alignment: .leading).padding(.top, 6)
         }
       }
     }

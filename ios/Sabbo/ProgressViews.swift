@@ -152,6 +152,8 @@ struct TogetherView: View {
   @State private var loading = true
   @State private var selected: TimelineDay?
   @State private var filter = "both"
+  @State private var subjectFilter = "all"
+  @State private var search = ""
   @State private var error: String?
   private var ownID: String { model.session?.user_id ?? "" }
   private var peer: Streak? { model.local.today?.streaks.first { $0.user_id != ownID } }
@@ -165,30 +167,33 @@ struct TogetherView: View {
         people: [TimelinePerson(user_id: ownID, name: model.userName, attempts: attempts.sorted { $0.submitted_at < $1.submitted_at })]))
     }
     return days.filter { day in
-      filter == "both" || day.people.contains { $0.id == filter && !$0.attempts.isEmpty }
+      (filter == "both" || day.people.contains { $0.id == filter && !$0.attempts.isEmpty })
+        && (subjectFilter == "all" || day.question.subject_id == subjectFilter)
+        && (search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+          || (day.question.title ?? day.question.prompt).localizedStandardContains(search.trimmingCharacters(in: .whitespacesAndNewlines)))
     }.sorted { $0.assignment.day == $1.assignment.day ? $0.id < $1.id : $0.assignment.day > $1.assignment.day }
   }
   var body: some View {
     ScrollView {
       LazyVStack(alignment: .leading, spacing: 18) {
-        HStack(alignment: .top, spacing: 12) {
-          ForEach(model.local.progress?.people ?? []) { person in
-            VStack(spacing: 8) {
-              PlayerAvatar(userID: person.id, size: 60)
-              Text(person.streak.name).font(.system(.headline, design: .rounded))
-              ViewThatFits {
-                HStack(spacing: 12) { counters(person) }
-                VStack(spacing: 6) { counters(person) }
-              }
-            }.padding(16).frame(maxWidth: .infinity)
-              .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22))
-          }
-        }
+        ViewThatFits(in: .horizontal) {
+          HStack(spacing: 16) { profiles }
+          VStack(alignment: .leading, spacing: 12) { profiles }
+        }.padding(14).frame(maxWidth: .infinity, alignment: .leading)
+          .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18))
         Picker("Vis økter", selection: $filter) {
           Text("Begge").tag("both")
           Text("Meg").tag(ownID)
           if let peer { Text(peer.name).tag(peer.user_id) }
         }.pickerStyle(.segmented).accessibilityIdentifier("timeline-filter")
+        HStack {
+          Picker("Fag", selection: $subjectFilter) {
+            Text("Alle fag").tag("all")
+            ForEach(["pome", "reli", "psyc", "samf"], id: \.self) { Text(StudyText.subject($0)).tag($0) }
+          }.accessibilityIdentifier("timeline-subject")
+          Spacer()
+          Text("\(visible.count) økter").font(.caption).foregroundStyle(.secondary)
+        }
         if filter == "both" || filter == ownID { privateDrafts }
         if let error {
           Text(error).font(.caption).foregroundStyle(.secondary)
@@ -196,15 +201,19 @@ struct TogetherView: View {
         }
         if loading && visible.isEmpty { ProgressView() }
         if !loading && visible.isEmpty {
-          ContentUnavailableView("Ingen økter ennå", systemImage: "person.2", description: Text("Fullfør dagens økt for å se resultatet her."))
+          ContentUnavailableView(search.isEmpty && subjectFilter == "all" ? "Ingen økter ennå" : "Ingen treff", systemImage: "magnifyingglass", description: Text(search.isEmpty && subjectFilter == "all" ? "Når dere leverer en økt, finner dere den her." : "Prøv et annet søk eller fag."))
         }
-        ForEach(visible) { day in
+        ForEach(Array(visible.enumerated()), id: \.element.id) { index, day in
+          if index == 0 || month(day) != month(visible[index - 1]) {
+            Text(monthTitle(day)).font(.headline).padding(.top, 8)
+          }
           NavigationLink {
             DayResultView(assignment: day.assignment, question: day.question, personID: filter == "both" ? nil : filter)
           } label: { row(day) }.buttonStyle(.plain).accessibilityIdentifier("timeline-day-" + day.id)
         }
       }.padding(22).frame(maxWidth: 620).frame(maxWidth: .infinity)
     }.background(Color(.systemGroupedBackground)).navigationTitle("Sammen")
+      .searchable(text: $search, prompt: "Søk etter øktens tittel")
       .task { await load() }.refreshable { await model.refresh(); await load() }
       .onChange(of: model.sharedAssignmentID) { _, value in if value != nil { Task { await load() } } }
       .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await load() } } }
@@ -214,6 +223,23 @@ struct TogetherView: View {
       .navigationDestination(isPresented: Binding(get: { selected != nil }, set: { if !$0 { selected = nil } })) {
         if let day = selected { DayResultView(assignment: day.assignment, question: day.question) }
       }
+  }
+  private func month(_ day: TimelineDay) -> String { String(day.assignment.day.prefix(7)) }
+  private func monthTitle(_ day: TimelineDay) -> String {
+    let input = DateFormatter(); input.locale = Locale(identifier: "en_US_POSIX"); input.dateFormat = "yyyy-MM-dd"
+    let output = DateFormatter(); output.locale = Locale(identifier: "nb_NO"); output.dateFormat = "LLLL yyyy"
+    return input.date(from: day.assignment.day).map { output.string(from: $0).capitalized } ?? month(day)
+  }
+  @ViewBuilder private var profiles: some View {
+    ForEach(model.local.progress?.people ?? []) { person in
+      HStack(spacing: 10) {
+        PlayerAvatar(userID: person.id, size: 36)
+        VStack(alignment: .leading, spacing: 4) {
+          Text(person.streak.name).font(.subheadline.bold())
+          HStack(spacing: 12) { counters(person) }.font(.caption)
+        }
+      }.fixedSize(horizontal: true, vertical: false).frame(maxWidth: .infinity, alignment: .leading)
+    }
   }
   @ViewBuilder private func counters(_ person: PersonProgress) -> some View {
     Label("\(person.streak.current)", systemImage: "flame.fill").foregroundStyle(SabboStyle.orange)
@@ -252,6 +278,7 @@ struct TogetherView: View {
         Spacer()
         Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
       }
+      Text(StudyText.subject(day.question.subject_id)).font(.caption.weight(.semibold)).foregroundStyle(Color.accentColor)
       Text(day.question.title ?? day.question.prompt).font(.system(.headline, design: .rounded)).foregroundStyle(.primary)
       ForEach(day.people.filter { filter == "both" || $0.id == filter }) { person in
         HStack(alignment: .top, spacing: 10) {
@@ -271,7 +298,10 @@ struct TogetherView: View {
     }.padding(18).background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22))
   }
   private func load() async {
-    guard !model.testing else { loading = false; return }
+    if model.testing {
+      if let id = model.local.today?.id, let day = model.presentationFixture(id) { sessions = [day] }
+      loading = false; return
+    }
     let account = ownID
     await model.refreshProgress()
     do {

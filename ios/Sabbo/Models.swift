@@ -188,6 +188,7 @@ struct LocalState: Codable {
   var today: Today?
   var drafts: [String: String] = [:]
   var draftSync: [String: DraftSync]? = nil
+  var editorPositions: [String: String]? = nil
   var pending: [Pending] = []
   var feedback: [String: Feedback] = [:]
   var subjects: [Subject] = []

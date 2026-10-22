@@ -10,7 +10,7 @@ struct DayResultView: View {
   var body: some View {
     ScrollView {
       DayResultsContent(assignment: assignment, question: question, initialPersonID: personID, initialStage: stage)
-        .padding(22).frame(maxWidth: 620).frame(maxWidth: .infinity)
+        .padding(22).frame(maxWidth: 1100).frame(maxWidth: .infinity)
     }.background(Color(.systemGroupedBackground))
       .navigationTitle(StudyText.day(assignment.day)).navigationBarTitleDisplayMode(.inline)
   }
@@ -28,6 +28,8 @@ struct DayResultsContent: View {
   @State private var selectedPerson = ""
   @State private var stage = "daily"
   @State private var error: String?
+  @State private var selectedQuestion = 0
+  @State private var comparing = false
   private var ownID: String { model.session?.user_id ?? "" }
   private var people: [TimelinePerson] {
     if let loaded { return loaded.people }
@@ -52,13 +54,18 @@ struct DayResultsContent: View {
          assignment.day == model.local.today?.server_day, !model.answersLocked(question) {
         SharedUnlockBanner(key: "together:" + assignment.id)
       }
-      if !bonus.isEmpty {
+      if people.contains(where: { !$0.bonusAttempts.isEmpty }) {
         Picker("Runde", selection: $stage) {
           Text("Dagens økt").tag("daily")
           Text("Bonusrunde").tag("bonus")
         }.pickerStyle(.segmented).accessibilityIdentifier("result-stage")
       }
-      if stage == "bonus", let latest = bonus.last {
+      if people.count > 1 {
+        Toggle("Sammenlign svar", isOn: $comparing).accessibilityIdentifier("compare-answers")
+      }
+      if comparing {
+        comparison
+      } else if stage == "bonus", let latest = bonus.last {
         attempt(latest)
         if currentBonus {
           BonusPrizeView()
@@ -78,6 +85,8 @@ struct DayResultsContent: View {
             }
           }.font(.subheadline)
         }
+      } else if stage == "bonus" {
+        Text("Ingen bonusbesvarelse fra denne personen ennå.").foregroundStyle(.secondary)
       } else if let daily = person?.daily {
         attempt(daily)
         if mine {
@@ -110,8 +119,8 @@ struct DayResultsContent: View {
       }
     }
     .environment(\.artworkAssignmentID, assignment.id)
-    .task(id: assignment.id) { selectedPerson = initialPersonID ?? ownID; stage = initialStage; await load() }
-    .onChange(of: selectedPerson) { old, _ in if !old.isEmpty { stage = "daily" } }
+    .task(id: assignment.id) { selectedPerson = initialPersonID ?? ownID; stage = initialStage; selectedQuestion = 0; await load() }
+
     .onChange(of: model.bonusStatus) { _, _ in Task { await load() } }
     .onChange(of: model.local.history.count) { _, _ in Task { await load() } }
     .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await load() } } }
@@ -122,7 +131,7 @@ struct DayResultsContent: View {
   @ViewBuilder private func attempt(_ item: HistoryItem) -> some View {
     SubmissionReceiptView(status: item.receipt_status, day: item.day)
     if mine {
-      EvaluationCard(attemptID: item.id, question: question)
+      EvaluationCard(attemptID: item.id, question: question, showsCriteria: false, feedbackHidden: item.answers_locked == true)
     } else {
       PeerEvaluation(evaluation: item.evaluations?.last, hidden: item.answers_locked == true || model.answersLocked(question))
     }
@@ -132,11 +141,12 @@ struct DayResultsContent: View {
     } else if item.answers_locked == true {
       Text("Svarene vises når begge har levert dagens økt.").font(.subheadline).foregroundStyle(.secondary)
     } else {
-      DisclosureGroup("Svar og eksempelsvar") {
-        ResultAnswersView(question: question, answer: item.answer,
-          feedback: model.resultFeedback(question, assignmentID: assignment.id),
-          answerLabel: mine ? "Ditt svar" : "\(person?.name ?? "") sitt svar").padding(.top, 10)
-      }.font(.subheadline).accessibilityIdentifier("result-answers")
+      ResultAnswersView(question: item.question, answer: item.answer,
+        feedback: model.resultFeedback(item.question, assignmentID: assignment.id),
+        answerLabel: mine ? "Ditt svar" : "\(person?.name ?? "") sitt svar",
+        result: mine ? model.savedEvaluation(item.id)?.result : item.evaluations?.last?.result,
+        selection: $selectedQuestion)
+        .accessibilityIdentifier("result-answers")
       if !item.revisions.isEmpty {
         DisclosureGroup("Tidligere versjoner") {
           ForEach(item.revisions) { revision in
@@ -147,8 +157,22 @@ struct DayResultsContent: View {
       }
     }
   }
+  private var comparison: some View {
+    VStack(alignment: .leading, spacing: 18) {
+      let parts = question.parts ?? [question]
+      if !parts.isEmpty {
+        let part = parts[min(selectedQuestion, parts.count - 1)]
+        QuestionNavigator(parts: parts, selection: $selectedQuestion)
+        Text("Oppgave \(min(selectedQuestion, parts.count - 1) + 1)").font(.title3.bold())
+        QuestionPrompt(question: part)
+        QuestionMaterials(question: part, showExpectations: false)
+        ComparisonAnswers(people: people, question: question, part: part, stage: stage, assignmentID: assignment.id)
+        SourceLinks(question: part)
+      }
+    }.padding(18).background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18))
+  }
   private func load() async {
-    guard !model.testing else { return }
+    if model.testing { loaded = model.presentationFixture(assignment.id); return }
     let account = ownID
     do {
       let value: TimelineDay = try await model.api.get("/timeline/" + assignment.id)
@@ -171,19 +195,51 @@ private struct PeerEvaluation: View {
   let hidden: Bool
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
+      Text("Veiledende KI-vurdering").font(.caption).foregroundStyle(.secondary)
       Text(StudyText.evaluation(evaluation)).font(.system(.title, design: .rounded, weight: .bold)).foregroundStyle(Color("AccentColor"))
       if !hidden, let result = evaluation?.result {
-        Text(result.reason)
-        if !result.improvement.isEmpty { Label("Neste steg", systemImage: "arrow.up.right").font(.subheadline.bold()); Text(result.improvement).font(.subheadline) }
-        DisclosureGroup("Vurderingsdetaljer") {
-          Text(result.strengths)
-          ForEach(result.criteria) { criterion in
-            Text(criterion.comment).padding(.top, 8)
-            if !criterion.evidence.isEmpty { Text("«\(criterion.evidence)»").italic() }
-          }
-        }.font(.subheadline)
+        AssessmentSummary(result: result)
       }
     }.padding(20).frame(maxWidth: .infinity, alignment: .leading)
       .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22))
+  }
+}
+
+private struct ComparisonAnswers: View {
+  @EnvironmentObject var model: AppModel
+  @Environment(\.horizontalSizeClass) private var sizeClass
+  @Environment(\.dynamicTypeSize) private var typeSize
+  let people: [TimelinePerson]
+  let question: Question
+  let part: Question
+  let stage: String
+  let assignmentID: String
+  var body: some View {
+    let layout = sizeClass == .regular && !typeSize.isAccessibilitySize
+      ? AnyLayout(HStackLayout(alignment: .top, spacing: 24))
+      : AnyLayout(VStackLayout(alignment: .leading, spacing: 24))
+    layout {
+      ForEach(people) { person in
+        VStack(alignment: .leading, spacing: 12) {
+          let item = stage == "bonus" ? person.bonusAttempts.last : person.daily
+          let mine = person.id == model.session?.user_id
+          Text(mine ? "Ditt svar" : person.name + " sitt svar").font(.headline)
+          if model.answersLocked(question) {
+            BonusAnswersHidden()
+          } else if let item {
+            if item.answers_locked == true {
+              Text("Svarene vises når begge har levert dagens økt.").foregroundStyle(.secondary)
+            } else {
+              let result = mine ? model.savedEvaluation(item.id)?.result : item.evaluations?.last?.result
+              if let grade = result?.grade {
+                Text("Veiledende KI-vurdering · \(grade) av 6").font(.caption).foregroundStyle(.secondary)
+              }
+              AnswerAssessment(question: question, part: part, answer: item.answer, label: "Besvarelse",
+                result: result, feedback: model.resultFeedback(item.question, assignmentID: assignmentID))
+            }
+          } else { Text("Ikke levert ennå.").foregroundStyle(.secondary) }
+        }.frame(maxWidth: .infinity, alignment: .topLeading)
+      }
+    }
   }
 }

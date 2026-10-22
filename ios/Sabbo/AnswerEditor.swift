@@ -6,7 +6,9 @@ final class OwnWordsTextView: UITextView, UITextPasteDelegate, UITextDropDelegat
   var blocked: (() -> Void)?
   private(set) var allowsClipboard = false
   func setAccount(_ userID: String?) {
-    allowsClipboard = userID == ClientProfile.ownerID
+    let allowed = userID == ClientProfile.ownerID
+    guard allowsClipboard != allowed else { return }
+    allowsClipboard = allowed
     pasteDelegate = allowsClipboard ? nil : self
     pasteConfiguration = allowsClipboard ? UIPasteConfiguration(forAccepting: NSString.self) : nil
     accessibilityHint = allowsClipboard ? "Skriv eller lim inn svaret." : "Skriv svaret med egne ord."
@@ -63,6 +65,12 @@ struct AnswerEditor: UIViewRepresentable {
   func makeUIView(context: Context) -> OwnWordsTextView {
     let view = OwnWordsTextView()
     view.configure()
+    view.isScrollEnabled = false
+    let toolbar = UIToolbar()
+    toolbar.items = [UIBarButtonItem(systemItem: .flexibleSpace),
+      UIBarButtonItem(title: "Ferdig med å skrive", primaryAction: UIAction { [weak view] _ in view?.resignFirstResponder() })]
+    toolbar.sizeToFit()
+    view.inputAccessoryView = toolbar
     view.setAccount(model.session?.user_id)
     view.delegate = context.coordinator
     view.blocked = blocked
@@ -77,6 +85,11 @@ struct AnswerEditor: UIViewRepresentable {
       view.selectedRange = NSRange(
         location: min(selection.location, (text as NSString).length), length: 0)
     }
+  }
+  func sizeThatFits(_ proposal: ProposedViewSize, uiView: OwnWordsTextView, context: Context) -> CGSize? {
+    guard let width = proposal.width else { return nil }
+    let size = uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+    return CGSize(width: width, height: max(230, size.height))
   }
   func makeCoordinator() -> Coordinator { Coordinator(self) }
   final class Coordinator: NSObject, UITextViewDelegate {
