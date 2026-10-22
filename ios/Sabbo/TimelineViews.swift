@@ -131,7 +131,7 @@ struct DayResultsContent: View {
   @ViewBuilder private func attempt(_ item: HistoryItem) -> some View {
     SubmissionReceiptView(status: item.receipt_status, day: item.day)
     if mine {
-      EvaluationCard(attemptID: item.id, question: question, showsCriteria: false)
+      EvaluationCard(attemptID: item.id, question: question, showsCriteria: false, feedbackHidden: item.answers_locked == true)
     } else {
       PeerEvaluation(evaluation: item.evaluations?.last, hidden: item.answers_locked == true || model.answersLocked(question))
     }

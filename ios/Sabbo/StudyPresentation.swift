@@ -34,7 +34,7 @@ enum StudyPresentation {
   }
   static func paragraphs(_ body: String) -> [String] {
     // Preserve every word; only separate explicitly labelled extracts/examples.
-    body.replacingOccurrences(of: #"(?<=\.) (?=(?:[ABC][,:]|[\p{L}]+ \d{4}(?:[––-]\d{4})?:))"#,
+    body.replacingOccurrences(of: #"(?<=\.) (?=(?:[ABC][,:]|[\p{L}]+ \d{4}(?:[–-]\d{4})?:))"#,
       with: "\n\n", options: .regularExpression)
       .components(separatedBy: "\n").filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
   }
@@ -124,11 +124,16 @@ struct QuestionNavigator: View {
   @Binding var selection: Int
   var body: some View {
     if parts.count > 1 {
-      Picker("Oppgave", selection: $selection) {
-        ForEach(Array(parts.enumerated()), id: \.element.id) { index, part in
-          Text("\(index + 1). " + part.displayPrompt).tag(index)
+      Menu {
+        Picker("Oppgave", selection: $selection) {
+          ForEach(Array(parts.enumerated()), id: \.element.id) { index, part in
+            Text("\(index + 1). " + part.displayPrompt).tag(index)
+          }
         }
-      }.pickerStyle(.menu).accessibilityIdentifier("result-question-picker")
+      } label: {
+        Label("Velg oppgave · \(selection + 1) av \(parts.count)", systemImage: "list.bullet")
+          .frame(minHeight: 44)
+      }.accessibilityIdentifier("result-question-picker")
       HStack {
         Button("Forrige oppgave", systemImage: "chevron.left") { selection -= 1 }.disabled(selection == 0)
         Spacer()

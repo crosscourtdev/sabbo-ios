@@ -268,8 +268,11 @@ extension ResultFlowTests {
   private func reveal(_ element: XCUIElement, app: XCUIApplication) {
     for _ in 0..<12 {
       if element.isHittable { return }
-      app.swipeUp()
+      activeScroll(app).swipeUp()
     }
+  }
+  private func activeScroll(_ app: XCUIApplication) -> XCUIElement {
+    app.scrollViews.allElementsBoundByIndex.last(where: { $0.isHittable }) ?? app.scrollViews.firstMatch
   }
   private func evidence(_ app: XCUIApplication, _ name: String) {
     let attachment = XCTAttachment(screenshot: app.screenshot())
@@ -304,6 +307,22 @@ extension ResultFlowTests {
       app.terminate()
     }
   }
+  func testSwitchingPeopleRetainsQuestionAndBonusStage() {
+    let app = presentation("reading")
+    app.buttons["start-question"].tap()
+    let next = app.buttons["Neste oppgave"]
+    reveal(next, app: app); next.tap()
+    XCTAssertTrue(app.staticTexts["Oppgave 2"].exists)
+    for _ in 0..<8 { activeScroll(app).swipeDown() }
+    let person = app.segmentedControls["result-person"]
+    person.buttons.element(boundBy: 1).tap()
+    XCTAssertTrue(app.staticTexts["Oppgave 2"].exists)
+    app.segmentedControls["result-stage"].buttons["Bonusrunde"].tap()
+    XCTAssertTrue(app.staticTexts["Ingen bonusbesvarelse fra denne personen ennå."].exists)
+    person.buttons["Meg"].tap()
+    XCTAssertTrue(app.segmentedControls["result-stage"].buttons["Bonusrunde"].isSelected)
+    XCTAssertTrue(app.staticTexts["Oppgave 2"].exists)
+  }
   func testWritingResumesQuestionAndKeepsKeyboardNavigationAvailable() {
     let app = presentation("writing")
     app.buttons["start-question"].tap()
@@ -311,6 +330,7 @@ extension ResultFlowTests {
     XCTAssertFalse(app.buttons["next-question"].isEnabled)
     let editor = app.textViews["answer-editor"]
     reveal(editor, app: app); editor.tap(); editor.typeText("Jeg sammenligner to forklaringer.")
+    XCTAssertEqual(editor.value as? String, "Jeg sammenligner to forklaringer.")
     XCTAssertTrue(app.buttons["next-question"].isHittable)
     evidence(app, "Writing with keyboard navigation")
     app.buttons["Lukk"].tap()

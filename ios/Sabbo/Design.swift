@@ -118,6 +118,7 @@ struct EvaluationCard: View {
   let attemptID: String
   var question: Question? = nil
   var showsCriteria = true
+  var feedbackHidden = false
   @Environment(\.scenePhase) private var scenePhase
   @State private var retry = 0
   @State private var loadError: String?
@@ -136,7 +137,7 @@ struct EvaluationCard: View {
               Text("Veiledende KI-vurdering").font(.caption).foregroundStyle(.secondary)
               GradeHeadline(grade: grade, key: "grade:" + attemptID, celebrate: celebrates).id(attemptID + String(grade))
             }
-            if model.answersLocked(attemptID: attemptID) || question.map({ model.answersLocked($0) }) == true { BonusAnswersHidden() } else {
+            if feedbackHidden || model.answersLocked(attemptID: attemptID) || question.map({ model.answersLocked($0) }) == true { BonusAnswersHidden() } else {
             AssessmentSummary(result: result, question: question, showsCriteria: showsCriteria)
             }
           }

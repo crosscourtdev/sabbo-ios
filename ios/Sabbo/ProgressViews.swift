@@ -201,7 +201,7 @@ struct TogetherView: View {
         }
         if loading && visible.isEmpty { ProgressView() }
         if !loading && visible.isEmpty {
-          ContentUnavailableView(search.isEmpty && subjectFilter == "all" ? "Ingen økter ennå" : "Ingen treff", systemImage: "magnifyingglass", description: Text("Prøv et annet søk eller fag. Dine uleverte svar ligger over."))
+          ContentUnavailableView(search.isEmpty && subjectFilter == "all" ? "Ingen økter ennå" : "Ingen treff", systemImage: "magnifyingglass", description: Text(search.isEmpty && subjectFilter == "all" ? "Når dere leverer en økt, finner dere den her." : "Prøv et annet søk eller fag."))
         }
         ForEach(Array(visible.enumerated()), id: \.element.id) { index, day in
           if index == 0 || month(day) != month(visible[index - 1]) {

@@ -6,7 +6,9 @@ final class OwnWordsTextView: UITextView, UITextPasteDelegate, UITextDropDelegat
   var blocked: (() -> Void)?
   private(set) var allowsClipboard = false
   func setAccount(_ userID: String?) {
-    allowsClipboard = userID == ClientProfile.ownerID
+    let allowed = userID == ClientProfile.ownerID
+    guard allowsClipboard != allowed else { return }
+    allowsClipboard = allowed
     pasteDelegate = allowsClipboard ? nil : self
     pasteConfiguration = allowsClipboard ? UIPasteConfiguration(forAccepting: NSString.self) : nil
     accessibilityHint = allowsClipboard ? "Skriv eller lim inn svaret." : "Skriv svaret med egne ord."

@@ -98,11 +98,16 @@
         criteria: [CriterionResult(criterion_id: first.id + ".c1", attainment: "strong", evidence: "Et stort utvalg er ikke nødvendigvis representativt.", comment: "Du vurderer utvalg og metode konkret."),
                    CriterionResult(criterion_id: second.id + ".c1", attainment: "met", evidence: "Jeg sammenligner to forklaringer", comment: "Du foreslår en relevant sammenligning.")]))
       let item = HistoryItem(id: "presentation-own", answer: answer, question: q, assignment_id: a.id, day: a.day, mode: "daily", assessment: "completed", assisted: 0, submitted_at: "2026-10-20T10:00:00Z", revisions: [], evaluations: [result])
-      local.history = mode == "writing" ? [] : [item]
+      let bonus = HistoryItem(id: "presentation-bonus", answer: answer, question: q, assignment_id: a.id, day: a.day, mode: "bonus", assessment: "completed", assisted: 0, submitted_at: "2026-10-20T10:10:00Z", revisions: [], evaluations: [result], receipt_status: "practice")
+      local.history = mode == "writing" ? [] : [item, bonus]
+      evaluations[bonus.id] = result
       evaluations[item.id] = result
       local.bonus = nil
       local.today = Today(assignment: a, question: q, attempt: mode == "writing" ? nil : Attempt(id: item.id, user_id: "uitest", assignment_id: a.id, answer: answer, assessment: "completed", completed_at: item.submitted_at, assisted: 0), draft: nil,
         streaks: local.today!.streaks + [Streak(user_id: "peer", name: ClientProfile.ownerName, current: 2, best: 2, completed_today: true, week_days: 2, days: [])], server_day: a.day)
+      if let peer = local.today?.streaks.last {
+        local.progress = PairProgress(people: (local.progress?.people ?? []) + [PersonProgress(streak: peer, stars: Stars(total: 40, epoch: "presentation", awards: []), fire_attempt_id: nil)])
+      }
       local.drafts = mode == "writing" ? [a.id: AnswerSet.encode([first.id: longAnswer])] : [:]
     }
     private func installResultFixture(_ state: String) {

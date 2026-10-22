@@ -345,8 +345,10 @@ struct GoalSessionView: View {
       .sheet(isPresented: $draftVersions, onDismiss: {
         if answer == nil { raw = model.local.drafts[draftKey] ?? raw }
       }) { NavigationStack { DraftVersionsView(day: current) } }
-      .onChange(of: model.local.drafts[draftKey]) { _, value in
-        if answer == nil, let value, !DraftSync.equal(raw, value) { raw = value }
+      .onChange(of: model.local.drafts[draftKey]) { _, _ in
+        // A render can observe an earlier keystroke after another edit was saved.
+        // Read the current draft so that our own save notifications cannot rewind typing.
+        if answer == nil, let value = model.local.drafts[draftKey], !DraftSync.equal(raw, value) { raw = value }
       }
       .onChange(of: index) { _, value in
         guard parts.indices.contains(value), answer == nil else { return }
