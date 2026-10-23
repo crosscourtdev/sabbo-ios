@@ -3,6 +3,19 @@ import UIKit
 
 /// Clipboard is available only to the owner; typed input remains unrestricted.
 final class OwnWordsTextView: UITextView, UITextPasteDelegate, UITextDropDelegate {
+  #if DEBUG
+  func trace(_ event: String) {
+    if ProcessInfo.processInfo.environment["SABBO_UI_TEST"] == "1",
+       ProcessInfo.processInfo.environment["SABBO_INPUT_TRACE"] == "1" {
+      NSLog("SABBO_INPUT %@ text=%@ selection=%@", event, text ?? "", NSStringFromRange(selectedRange))
+    }
+  }
+  override func insertText(_ text: String) {
+    trace("before insert " + text)
+    super.insertText(text)
+    trace("after insert " + text)
+  }
+  #endif
   var blocked: (() -> Void)?
   private(set) var allowsClipboard = false
   func setAccount(_ userID: String?) {
@@ -77,6 +90,9 @@ struct AnswerEditor: UIViewRepresentable {
     return view
   }
   func updateUIView(_ view: OwnWordsTextView, context: Context) {
+    #if DEBUG
+    view.trace("update binding=" + text)
+    #endif
     context.coordinator.parent = self
     view.setAccount(model.session?.user_id)
     if view.text != text && view.markedTextRange == nil {

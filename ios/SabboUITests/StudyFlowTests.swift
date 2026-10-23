@@ -260,6 +260,7 @@ extension ResultFlowTests {
     let app = XCUIApplication()
     app.launchEnvironment["SABBO_UI_TEST"] = "1"
     app.launchEnvironment["SABBO_PRESENTATION_FIXTURE"] = mode
+    if mode == "writing" { app.launchEnvironment["SABBO_INPUT_TRACE"] = "1" }
     if large { app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"] }
     app.launch()
     XCTAssertTrue(app.buttons["start-question"].waitForExistence(timeout: 10))

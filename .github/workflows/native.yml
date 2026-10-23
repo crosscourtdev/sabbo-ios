@@ -71,6 +71,11 @@ jobs:
             -destination "platform=iOS Simulator,id=$device_id" \
             CODE_SIGNING_ALLOWED=NO -resultBundlePath /tmp/sabbo-native-results.xcresult \
             -only-testing:SabboUITests/ResultFlowTests -only-testing:SabboUITests/BonusFlowTests test
+      - name: Collect synthetic editor diagnostic
+        if: always() && matrix.platform == 'ios'
+        run: |
+          mkdir -p /tmp/sabbo-ui-evidence
+          xcrun simctl spawn booted log show --last 30m --style compact --predicate 'eventMessage BEGINSWITH "SABBO_INPUT"' > /tmp/sabbo-ui-evidence/input-trace.txt
       - name: Export native UI evidence
         if: always()
         run: |
