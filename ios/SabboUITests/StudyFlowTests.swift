@@ -267,14 +267,18 @@ extension ResultFlowTests {
   }
   private func reveal(_ element: XCUIElement, app: XCUIApplication) {
     for _ in 0..<12 {
-      if element.isHittable { return }
       let scroll = activeScroll(app)
-      // Short drags avoid jumping past controls in compact result sheets.
-      // Aim toward the middle so the fixed footer cannot cover the target.
-      let movingDown = element.frame.midY < scroll.frame.midY
+      let viewport = scroll.frame
+      let targetY = element.frame.midY
+      // A partly clipped control can report hittable behind a fixed footer.
+      // Bring it into the middle of the sheet before attempting the tap.
+      let margin = viewport.height * 0.2
+      if targetY >= viewport.minY + margin && targetY <= viewport.maxY - margin && element.isHittable { return }
+      let movingDown = targetY < viewport.midY
       #if targetEnvironment(macCatalyst)
-      let distance = scroll.frame.height * 0.3
-      scroll.scroll(byDeltaX: 0, deltaY: movingDown ? distance : -distance)
+      let limit = viewport.height * 0.6
+      let distance = max(-limit, min(limit, viewport.midY - targetY))
+      scroll.scroll(byDeltaX: 0, deltaY: distance)
       #else
       let start = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: movingDown ? 0.35 : 0.65))
       let end = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: movingDown ? 0.65 : 0.35))
