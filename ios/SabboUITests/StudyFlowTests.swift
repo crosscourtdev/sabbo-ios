@@ -267,22 +267,26 @@ extension ResultFlowTests {
   }
   private func reveal(_ element: XCUIElement, app: XCUIApplication) {
     for _ in 0..<12 {
+      #if targetEnvironment(macCatalyst)
       let scroll = activeScroll(app)
       let viewport = scroll.frame
-      let targetY = element.frame.midY
+      // Lazy content may not have an accessibility frame until scrolled into view.
+      let targetY = element.exists ? element.frame.midY : viewport.maxY + viewport.height
       // A partly clipped control can report hittable behind a fixed footer.
       // Bring it into the middle of the sheet before attempting the tap.
       let margin = viewport.height * 0.2
       if targetY >= viewport.minY + margin && targetY <= viewport.maxY - margin && element.isHittable { return }
-      let movingDown = targetY < viewport.midY
-      #if targetEnvironment(macCatalyst)
       let limit = viewport.height * 0.6
       let distance = max(-limit, min(limit, viewport.midY - targetY))
       scroll.scroll(byDeltaX: 0, deltaY: distance)
       #else
-      let start = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: movingDown ? 0.35 : 0.65))
-      let end = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: movingDown ? 0.65 : 0.35))
-      start.press(forDuration: 0.05, thenDragTo: end)
+      if element.isHittable { return }
+      let scroll = activeScroll(app)
+      if element.exists && element.frame.midY < scroll.frame.minY {
+        scroll.swipeDown(velocity: .slow)
+      } else {
+        scroll.swipeUp(velocity: .slow)
+      }
       #endif
     }
   }
