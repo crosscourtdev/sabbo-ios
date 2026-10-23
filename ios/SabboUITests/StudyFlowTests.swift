@@ -269,13 +269,12 @@ extension ResultFlowTests {
     for _ in 0..<12 {
       if element.isHittable { return }
       let scroll = activeScroll(app)
-      // A previous swipe can move the target above the viewport. Reverse
-      // direction instead of repeatedly moving it farther out of reach.
-      if element.frame.midY < scroll.frame.minY {
-        scroll.swipeDown(velocity: .slow)
-      } else {
-        scroll.swipeUp(velocity: .slow)
-      }
+      // Short drags avoid jumping past controls in compact result sheets.
+      // Aim toward the middle so the fixed footer cannot cover the target.
+      let movingDown = element.frame.midY < scroll.frame.midY
+      let start = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: movingDown ? 0.35 : 0.65))
+      let end = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: movingDown ? 0.65 : 0.35))
+      start.press(forDuration: 0.05, thenDragTo: end)
     }
   }
   private func activeScroll(_ app: XCUIApplication) -> XCUIElement {
