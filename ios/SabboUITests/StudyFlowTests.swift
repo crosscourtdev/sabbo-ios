@@ -268,7 +268,14 @@ extension ResultFlowTests {
   private func reveal(_ element: XCUIElement, app: XCUIApplication) {
     for _ in 0..<12 {
       if element.isHittable { return }
-      activeScroll(app).swipeUp()
+      let scroll = activeScroll(app)
+      // A previous swipe can move the target above the viewport. Reverse
+      // direction instead of repeatedly moving it farther out of reach.
+      if element.frame.midY < scroll.frame.minY {
+        scroll.swipeDown(velocity: .slow)
+      } else {
+        scroll.swipeUp(velocity: .slow)
+      }
     }
   }
   private func activeScroll(_ app: XCUIApplication) -> XCUIElement {
