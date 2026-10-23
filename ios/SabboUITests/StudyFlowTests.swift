@@ -272,13 +272,23 @@ extension ResultFlowTests {
       // Short drags avoid jumping past controls in compact result sheets.
       // Aim toward the middle so the fixed footer cannot cover the target.
       let movingDown = element.frame.midY < scroll.frame.midY
+      #if targetEnvironment(macCatalyst)
+      let distance = scroll.frame.height * 0.3
+      scroll.scroll(byDeltaX: 0, deltaY: movingDown ? distance : -distance)
+      #else
       let start = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: movingDown ? 0.35 : 0.65))
       let end = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: movingDown ? 0.65 : 0.35))
       start.press(forDuration: 0.05, thenDragTo: end)
+      #endif
     }
   }
   private func activeScroll(_ app: XCUIApplication) -> XCUIElement {
+    #if targetEnvironment(macCatalyst)
+    // Catalyst exposes the sheet before its obscured background scroll view.
+    app.scrollViews.allElementsBoundByIndex.first(where: { $0.isHittable }) ?? app.scrollViews.firstMatch
+    #else
     app.scrollViews.allElementsBoundByIndex.last(where: { $0.isHittable }) ?? app.scrollViews.firstMatch
+    #endif
   }
   private func evidence(_ app: XCUIApplication, _ name: String) {
     let attachment = XCTAttachment(screenshot: app.screenshot())
