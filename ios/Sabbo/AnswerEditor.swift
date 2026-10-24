@@ -3,6 +3,18 @@ import UIKit
 
 /// Clipboard is available only to the owner; typed input remains unrestricted.
 final class OwnWordsTextView: UITextView, UITextPasteDelegate, UITextDropDelegate {
+  // UIKit can deliver several keystrokes before textViewDidChange. A repeated
+  // SwiftUI render of the last acknowledged value must not rewind that input.
+  private var lastModelText: String?
+  func applyModelText(_ value: String) {
+    guard value != lastModelText, markedTextRange == nil else { return }
+    lastModelText = value
+    guard text != value else { return }
+    let selection = selectedRange
+    text = value
+    selectedRange = NSRange(location: min(selection.location, (value as NSString).length), length: 0)
+  }
+  func acknowledgeUserText() { lastModelText = text }
   var blocked: (() -> Void)?
   private(set) var allowsClipboard = false
   func setAccount(_ userID: String?) {
@@ -79,12 +91,7 @@ struct AnswerEditor: UIViewRepresentable {
   func updateUIView(_ view: OwnWordsTextView, context: Context) {
     context.coordinator.parent = self
     view.setAccount(model.session?.user_id)
-    if view.text != text && view.markedTextRange == nil {
-      let selection = view.selectedRange
-      view.text = text
-      view.selectedRange = NSRange(
-        location: min(selection.location, (text as NSString).length), length: 0)
-    }
+    view.applyModelText(text)
   }
   func sizeThatFits(_ proposal: ProposedViewSize, uiView: OwnWordsTextView, context: Context) -> CGSize? {
     guard let width = proposal.width else { return nil }
@@ -95,6 +102,9 @@ struct AnswerEditor: UIViewRepresentable {
   final class Coordinator: NSObject, UITextViewDelegate {
     var parent: AnswerEditor
     init(_ parent: AnswerEditor) { self.parent = parent }
-    func textViewDidChange(_ textView: UITextView) { parent.text = textView.text }
+    func textViewDidChange(_ textView: UITextView) {
+      (textView as? OwnWordsTextView)?.acknowledgeUserText()
+      parent.text = textView.text
+    }
   }
 }

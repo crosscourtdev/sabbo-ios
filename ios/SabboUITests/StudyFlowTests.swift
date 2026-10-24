@@ -267,19 +267,36 @@ extension ResultFlowTests {
   }
   private func reveal(_ element: XCUIElement, app: XCUIApplication) {
     for _ in 0..<12 {
+      #if targetEnvironment(macCatalyst)
+      let scroll = activeScroll(app)
+      let viewport = scroll.frame
+      // Lazy content may not have an accessibility frame until scrolled into view.
+      let targetY = element.exists ? element.frame.midY : viewport.maxY + viewport.height
+      // A partly clipped control can report hittable behind a fixed footer.
+      // Bring it into the middle of the sheet before attempting the tap.
+      let margin = viewport.height * 0.2
+      if targetY >= viewport.minY + margin && targetY <= viewport.maxY - margin && element.isHittable { return }
+      let limit = viewport.height * 0.6
+      let distance = max(-limit, min(limit, viewport.midY - targetY))
+      scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).scroll(byDeltaX: 0, deltaY: distance)
+      #else
       if element.isHittable { return }
       let scroll = activeScroll(app)
-      // A previous swipe can move the target above the viewport. Reverse
-      // direction instead of repeatedly moving it farther out of reach.
-      if element.frame.midY < scroll.frame.minY {
+      if element.exists && element.frame.midY < scroll.frame.minY {
         scroll.swipeDown(velocity: .slow)
       } else {
         scroll.swipeUp(velocity: .slow)
       }
+      #endif
     }
   }
   private func activeScroll(_ app: XCUIApplication) -> XCUIElement {
+    #if targetEnvironment(macCatalyst)
+    // Catalyst exposes the sheet before its obscured background scroll view.
+    app.scrollViews.allElementsBoundByIndex.first(where: { $0.isHittable }) ?? app.scrollViews.firstMatch
+    #else
     app.scrollViews.allElementsBoundByIndex.last(where: { $0.isHittable }) ?? app.scrollViews.firstMatch
+    #endif
   }
   private func evidence(_ app: XCUIApplication, _ name: String) {
     let attachment = XCTAttachment(screenshot: app.screenshot())
