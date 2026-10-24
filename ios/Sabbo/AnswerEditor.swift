@@ -107,11 +107,6 @@ struct AnswerEditor: UIViewRepresentable {
     }
     #endif
     view.isScrollEnabled = false
-    let toolbar = UIToolbar()
-    toolbar.items = [UIBarButtonItem(systemItem: .flexibleSpace),
-      UIBarButtonItem(title: "Ferdig med å skrive", primaryAction: UIAction { [weak view] _ in view?.resignFirstResponder() })]
-    toolbar.sizeToFit()
-    view.inputAccessoryView = toolbar
     view.setAccount(model.session?.user_id)
     view.delegate = context.coordinator
     view.blocked = blocked
