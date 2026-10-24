@@ -3,18 +3,39 @@ import UIKit
 
 /// Clipboard is available only to the owner; typed input remains unrestricted.
 final class OwnWordsTextView: UITextView, UITextPasteDelegate, UITextDropDelegate {
+  #if DEBUG
+  func trace(_ event: String) {
+    if ProcessInfo.processInfo.environment["SABBO_UI_TEST"] == "1",
+       ProcessInfo.processInfo.environment["SABBO_INPUT_TRACE"] == "1" {
+      let line = "\(event) text=\(text ?? "") selection=\(NSStringFromRange(selectedRange))\n"
+      let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("sabbo-input-trace.txt")
+      if !FileManager.default.fileExists(atPath: url.path) { FileManager.default.createFile(atPath: url.path, contents: nil) }
+      if let file = try? FileHandle(forWritingTo: url) {
+        defer { try? file.close() }
+        try? file.seekToEnd(); try? file.write(contentsOf: Data(line.utf8))
+      }
+    }
+  }
+  override func insertText(_ text: String) {
+    trace("before insert " + text)
+    super.insertText(text)
+    trace("after insert " + text)
+  }
+  #endif
   // UIKit can deliver several keystrokes before textViewDidChange. A repeated
   // SwiftUI render of the last acknowledged value must not rewind that input.
   private var lastModelText: String?
   func applyModelText(_ value: String) {
+    trace("apply value=\(value) last=\(lastModelText ?? "nil")")
     guard value != lastModelText, markedTextRange == nil else { return }
     lastModelText = value
     guard text != value else { return }
     let selection = selectedRange
     text = value
     selectedRange = NSRange(location: min(selection.location, (value as NSString).length), length: 0)
+    trace("applied")
   }
-  func acknowledgeUserText() { lastModelText = text }
+  func acknowledgeUserText() { trace("acknowledge"); lastModelText = text }
   var blocked: (() -> Void)?
   private(set) var allowsClipboard = false
   func setAccount(_ userID: String?) {
@@ -110,6 +131,9 @@ struct AnswerEditor: UIViewRepresentable {
   final class Coordinator: NSObject, UITextViewDelegate {
     var parent: AnswerEditor
     init(_ parent: AnswerEditor) { self.parent = parent }
+    func textViewDidChangeSelection(_ textView: UITextView) {
+      (textView as? OwnWordsTextView)?.trace("selection changed")
+    }
     func textViewDidChange(_ textView: UITextView) {
       (textView as? OwnWordsTextView)?.acknowledgeUserText()
       parent.text = textView.text

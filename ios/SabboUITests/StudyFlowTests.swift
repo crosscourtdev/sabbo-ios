@@ -4,6 +4,7 @@ final class StudyFlowTests: XCTestCase {
   func testWriteReviewAndLocalCompletion() {
     let app = XCUIApplication()
     app.launchEnvironment["SABBO_UI_TEST"] = "1"
+    app.launchEnvironment["SABBO_INPUT_TRACE"] = "1"
     app.launch()
     XCTAssertTrue(app.buttons["start-question"].waitForExistence(timeout: 10))
     app.buttons["start-question"].tap()
@@ -21,6 +22,7 @@ final class StudyFlowTests: XCTestCase {
   func testGuidanceDoesNotCompleteDayAndBlankCannotSubmit() {
     let app = XCUIApplication()
     app.launchEnvironment["SABBO_UI_TEST"] = "1"
+    app.launchEnvironment["SABBO_INPUT_TRACE"] = "1"
     app.launch()
     app.buttons["start-question"].tap()
     XCTAssertFalse(app.buttons["submit-answer"].isEnabled)
@@ -35,6 +37,7 @@ final class ResultFlowTests: XCTestCase {
   private func open(_ state: String) -> XCUIApplication {
     let app = XCUIApplication()
     app.launchEnvironment["SABBO_UI_TEST"] = "1"
+    app.launchEnvironment["SABBO_INPUT_TRACE"] = "1"
     app.launchEnvironment["SABBO_RESULT_FIXTURE"] = state
     app.launch()
     app.buttons["start-question"].tap()
@@ -93,6 +96,7 @@ final class BonusFlowTests: XCTestCase {
   private func open(_ state: String) -> XCUIApplication {
     let app = XCUIApplication()
     app.launchEnvironment["SABBO_UI_TEST"] = "1"
+    app.launchEnvironment["SABBO_INPUT_TRACE"] = "1"
     app.launchEnvironment["SABBO_BONUS_FIXTURE"] = state
     app.launch()
     XCTAssertTrue(app.buttons["start-question"].waitForExistence(timeout: 8))
@@ -169,6 +173,7 @@ extension ResultFlowTests {
   func testTimelineGroupsDailyAndBonusWithoutHistoryTab() {
     let app = XCUIApplication()
     app.launchEnvironment["SABBO_UI_TEST"] = "1"
+    app.launchEnvironment["SABBO_INPUT_TRACE"] = "1"
     app.launchEnvironment["SABBO_TIMELINE_FIXTURE"] = "1"
     app.launch()
     XCTAssertTrue(app.buttons["start-question"].waitForExistence(timeout: 10))
@@ -207,6 +212,7 @@ extension ResultFlowTests {
   func testSubmitLeadsToQuestionChoiceAndKeepsAutomaticallyMergedAnswer() {
     let app = XCUIApplication()
     app.launchEnvironment["SABBO_UI_TEST"] = "1"
+    app.launchEnvironment["SABBO_INPUT_TRACE"] = "1"
     app.launchEnvironment["SABBO_DRAFT_FIXTURE"] = "1"
     app.launch()
     XCTAssertTrue(app.buttons["start-question"].waitForExistence(timeout: 10))
@@ -240,6 +246,7 @@ extension ResultFlowTests {
   func testUpdateNoticeCanBeDismissedWithoutBlockingStudy() {
     let app = XCUIApplication()
     app.launchEnvironment["SABBO_UI_TEST"] = "1"
+    app.launchEnvironment["SABBO_INPUT_TRACE"] = "1"
     app.launchEnvironment["SABBO_UPDATE_FIXTURE"] = "1"
     app.launch()
     XCTAssertTrue(app.staticTexts["Oppdatering tilgjengelig"].waitForExistence(timeout: 10))
@@ -259,6 +266,7 @@ extension ResultFlowTests {
   private func presentation(_ mode: String, large: Bool = false) -> XCUIApplication {
     let app = XCUIApplication()
     app.launchEnvironment["SABBO_UI_TEST"] = "1"
+    app.launchEnvironment["SABBO_INPUT_TRACE"] = "1"
     app.launchEnvironment["SABBO_PRESENTATION_FIXTURE"] = mode
     if large { app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"] }
     app.launch()
@@ -324,7 +332,9 @@ extension ResultFlowTests {
       if mode == "locked" {
         XCTAssertFalse(app.staticTexts["Jeg sammenligner utvalgene."].exists)
       } else {
+        print("READING BEFORE " + app.debugDescription)
         reveal(app.staticTexts["Jeg sammenligner utvalgene."], app: app)
+        print("READING AFTER " + app.debugDescription)
         XCTAssertTrue(app.staticTexts["Jeg sammenligner utvalgene."].exists)
         evidence(app, "Both answers and criteria")
       }
@@ -353,6 +363,7 @@ extension ResultFlowTests {
     evidence(app, "Person switch retains question and bonus round")
   }
   func testWritingResumesQuestionAndKeepsKeyboardNavigationAvailable() {
+    for _ in 0..<5 {
     let app = presentation("writing")
     app.buttons["start-question"].tap()
     XCTAssertTrue(app.staticTexts["Oppgave 2 av 2"].waitForExistence(timeout: 5))
@@ -371,6 +382,8 @@ extension ResultFlowTests {
     reveal(app.buttons["submit-session"], app: app)
     XCTAssertTrue(app.buttons["submit-session"].isEnabled)
     evidence(app, "Long answer final review")
+    app.terminate()
+    }
   }
   func testLargeTextShowsUntruncatedNextStepAndCriterionLabels() {
     let app = presentation("reading", large: true)
