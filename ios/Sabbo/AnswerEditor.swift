@@ -77,6 +77,14 @@ struct AnswerEditor: UIViewRepresentable {
   func makeUIView(context: Context) -> OwnWordsTextView {
     let view = OwnWordsTextView()
     view.configure()
+    #if DEBUG
+    if model.testing {
+      // Exercise exact input and draft persistence independently of the test
+      // machine's keyboard language and learned spelling corrections.
+      view.autocorrectionType = .no
+      view.spellCheckingType = .no
+    }
+    #endif
     view.isScrollEnabled = false
     let toolbar = UIToolbar()
     toolbar.items = [UIBarButtonItem(systemItem: .flexibleSpace),
