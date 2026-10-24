@@ -127,7 +127,7 @@ for scope in ["project", "target"]:
                     "MACOSX_DEPLOYMENT_TARGET": "15.0",
                     "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
                     "CURRENT_PROJECT_VERSION": "1",
-                    "MARKETING_VERSION": "0.5.2",
+                    "MARKETING_VERSION": "0.5.3",
                     "SWIFT_OPTIMIZATION_LEVEL": "-Onone" if mode == "Debug" else "-O",
                     "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "DEBUG"
                     if mode == "Debug"

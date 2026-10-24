@@ -369,15 +369,39 @@ extension ResultFlowTests {
     XCTAssertTrue(app.staticTexts["Oppgave 2 av 2"].waitForExistence(timeout: 5))
     XCTAssertFalse(app.buttons["next-question"].isEnabled)
     let editor = app.textViews["answer-editor"]
-    reveal(editor, app: app); editor.tap(); editor.typeText("Jeg sammenligner to forklaringer.")
+    reveal(editor, app: app); editor.tap()
+    // Let each edit reach SwiftUI and the local draft before continuing. A
+    // stale first-character render used to put subsequent input behind it.
+    editor.typeText("J")
+    XCTAssertEqual(editor.value as? String, "J")
+    editor.typeText("eg sammenligner to forklaringer.")
     XCTAssertEqual(editor.value as? String, "Jeg sammenligner to forklaringer.")
+    editor.typeText(XCUIKeyboardKey.delete.rawValue)
+    editor.typeText(".\nBegge må undersøkes.")
+    let answer = "Jeg sammenligner to forklaringer.\nBegge må undersøkes."
+    XCTAssertEqual(editor.value as? String, answer)
+    XCTAssertFalse(app.buttons["Ferdig med å skrive"].exists)
     XCTAssertTrue(app.buttons["next-question"].isHittable)
     evidence(app, "Writing with keyboard navigation")
+    #if !targetEnvironment(macCatalyst)
+    XCTAssertTrue(app.keyboards.firstMatch.exists)
+    // Interactive dismissal follows the finger only after it crosses into
+    // the keyboard. XCUI's default swipe stops just above that boundary.
+    let origin = app.coordinate(withNormalizedOffset: .zero)
+    let keyboardTop = app.keyboards.firstMatch.frame.minY
+    let dragStart = origin.withOffset(CGVector(dx: 12, dy: keyboardTop - 140))
+    let dragEnd = origin.withOffset(CGVector(dx: 12, dy: app.frame.maxY - 12))
+    dragStart.press(forDuration: 0.05, thenDragTo: dragEnd)
+    XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+    evidence(app, "Keyboard dismissed by scrolling")
+    reveal(editor, app: app); editor.tap()
+    XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+    #endif
     app.buttons["Lukk"].tap()
     app.buttons["start-question"].tap()
     XCTAssertTrue(app.staticTexts["Oppgave 2 av 2"].waitForExistence(timeout: 5))
     reveal(editor, app: app)
-    XCTAssertEqual(editor.value as? String, "Jeg sammenligner to forklaringer.")
+    XCTAssertEqual(editor.value as? String, answer)
     app.buttons["next-question"].tap()
     reveal(app.buttons["submit-session"], app: app)
     XCTAssertTrue(app.buttons["submit-session"].isEnabled)
