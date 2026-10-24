@@ -385,7 +385,13 @@ extension ResultFlowTests {
     evidence(app, "Writing with keyboard navigation")
     #if !targetEnvironment(macCatalyst)
     XCTAssertTrue(app.keyboards.firstMatch.exists)
-    activeScroll(app).swipeDown(velocity: .slow)
+    // Interactive dismissal follows the finger only after it crosses into
+    // the keyboard. XCUI's default swipe stops just above that boundary.
+    let origin = app.coordinate(withNormalizedOffset: .zero)
+    let keyboardTop = app.keyboards.firstMatch.frame.minY
+    let dragStart = origin.withOffset(CGVector(dx: 12, dy: keyboardTop - 140))
+    let dragEnd = origin.withOffset(CGVector(dx: 12, dy: app.frame.maxY - 12))
+    dragStart.press(forDuration: 0.05, thenDragTo: dragEnd)
     XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
     evidence(app, "Keyboard dismissed by scrolling")
     reveal(editor, app: app); editor.tap()
