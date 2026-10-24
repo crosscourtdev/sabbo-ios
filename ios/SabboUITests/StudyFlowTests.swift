@@ -260,7 +260,6 @@ extension ResultFlowTests {
     let app = XCUIApplication()
     app.launchEnvironment["SABBO_UI_TEST"] = "1"
     app.launchEnvironment["SABBO_PRESENTATION_FIXTURE"] = mode
-    if mode == "writing" { app.launchEnvironment["SABBO_INPUT_TRACE"] = "1" }
     if large { app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"] }
     app.launch()
     XCTAssertTrue(app.buttons["start-question"].waitForExistence(timeout: 10))
@@ -279,7 +278,7 @@ extension ResultFlowTests {
       if targetY >= viewport.minY + margin && targetY <= viewport.maxY - margin && element.isHittable { return }
       let limit = viewport.height * 0.6
       let distance = max(-limit, min(limit, viewport.midY - targetY))
-      scroll.scroll(byDeltaX: 0, deltaY: distance)
+      scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).scroll(byDeltaX: 0, deltaY: distance)
       #else
       if element.isHittable { return }
       let scroll = activeScroll(app)
