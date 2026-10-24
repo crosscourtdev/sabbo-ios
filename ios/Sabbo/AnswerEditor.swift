@@ -25,17 +25,39 @@ final class OwnWordsTextView: UITextView, UITextPasteDelegate, UITextDropDelegat
   // UIKit can deliver several keystrokes before textViewDidChange. A repeated
   // SwiftUI render of the last acknowledged value must not rewind that input.
   private var lastModelText: String?
+  private var pendingUserTexts: Set<String> = []
+  private var latestUserText: String?
+  private var editGeneration = 0
   func applyModelText(_ value: String) {
     trace("apply value=\(value) last=\(lastModelText ?? "nil")")
-    guard value != lastModelText, markedTextRange == nil else { return }
+    guard markedTextRange == nil else { return }
+    if value == latestUserText {
+      // The model has caught up. A later intentional draft change may now
+      // reuse an earlier value, so do not retain old edits indefinitely.
+      lastModelText = value
+      latestUserText = nil
+      pendingUserTexts.removeAll()
+      return
+    }
+    guard value != lastModelText, !pendingUserTexts.contains(value) else { return }
     lastModelText = value
+    latestUserText = nil
+    pendingUserTexts.removeAll()
     guard text != value else { return }
     let selection = selectedRange
+    let generation = editGeneration
     text = value
-    selectedRange = NSRange(location: min(selection.location, (value as NSString).length), length: 0)
+    if editGeneration == generation {
+      selectedRange = NSRange(location: min(selection.location, (value as NSString).length), length: 0)
+    }
     trace("applied")
   }
-  func acknowledgeUserText() { trace("acknowledge"); lastModelText = text }
+  func acknowledgeUserText() {
+    trace("acknowledge")
+    editGeneration += 1
+    latestUserText = text
+    pendingUserTexts.insert(text ?? "")
+  }
   var blocked: (() -> Void)?
   private(set) var allowsClipboard = false
   func setAccount(_ userID: String?) {
