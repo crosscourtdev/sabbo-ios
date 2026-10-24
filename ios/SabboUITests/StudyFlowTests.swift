@@ -316,7 +316,18 @@ extension ResultFlowTests {
       day.tap()
       let toggle = app.switches["compare-answers"]
       XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+      // Wait for the result reveal to land before switching presentation modes.
+      XCTAssertTrue(app.staticTexts["Sterkt levert!"].waitForExistence(timeout: 6))
+      reveal(toggle, app: app)
+      #if targetEnvironment(macCatalyst)
       toggle.tap()
+      #else
+      // SwiftUI exposes both a labelled row and its actual UIKit switch.
+      let control = toggle.switches.firstMatch
+      XCTAssertTrue(control.exists)
+      control.tap()
+      #endif
+      XCTAssertEqual(toggle.value as? String, "1")
       let next = app.buttons["Neste oppgave"]
       reveal(next, app: app); next.tap()
       XCTAssertTrue(app.staticTexts["Oppgave 2"].exists)

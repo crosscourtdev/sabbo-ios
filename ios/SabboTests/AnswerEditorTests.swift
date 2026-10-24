@@ -4,6 +4,44 @@ import XCTest
 @testable import Sabbo
 
 @MainActor final class AnswerEditorTests: XCTestCase {
+  func testDelayedModelEchoPreservesCursorAndSubsequentTyping() {
+    let editor = OwnWordsTextView()
+    editor.configure()
+    editor.autocorrectionType = .no
+    let prefix = "Jeg sammenligner to "
+    editor.applyModelText(prefix)
+    editor.selectedRange = NSRange(location: (prefix as NSString).length, length: 0)
+    for character in "forklaring" {
+      editor.insertText(String(character))
+      editor.acknowledgeUserText()
+    }
+    // Observed on iPhone: a queued render replays the earlier prefix after
+    // all later characters have already been published by the delegate.
+    editor.applyModelText(prefix)
+    editor.applyModelText(prefix + "forklaring")
+    editor.insertText("er.")
+    XCTAssertEqual(editor.text, "Jeg sammenligner to forklaringer.")
+    XCTAssertEqual(editor.selectedRange.location, (editor.text as NSString).length)
+  }
+
+  func testIntermediateEchoIsIgnoredButLaterDraftRollbackStillApplies() {
+    let editor = OwnWordsTextView()
+    editor.configure()
+    editor.autocorrectionType = .no
+    editor.applyModelText("")
+    for character in "Jeg" {
+      editor.insertText(String(character))
+      editor.acknowledgeUserText()
+    }
+    editor.applyModelText("Je")
+    XCTAssertEqual(editor.text, "Jeg")
+    XCTAssertEqual(editor.selectedRange.location, 3)
+    editor.applyModelText("Jeg")
+    editor.applyModelText("Je")
+    XCTAssertEqual(editor.text, "Je")
+    XCTAssertEqual(editor.selectedRange.location, 2)
+  }
+
   func testRepeatedModelRenderPreservesInputBeforeDelegateNotification() {
     let editor = OwnWordsTextView()
     editor.configure()

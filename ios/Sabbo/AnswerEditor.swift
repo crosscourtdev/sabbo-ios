@@ -3,18 +3,39 @@ import UIKit
 
 /// Clipboard is available only to the owner; typed input remains unrestricted.
 final class OwnWordsTextView: UITextView, UITextPasteDelegate, UITextDropDelegate {
-  // UIKit can deliver several keystrokes before textViewDidChange. A repeated
-  // SwiftUI render of the last acknowledged value must not rewind that input.
+  // SwiftUI may replay an older snapshot after UIKit has published newer edits.
+  // Keep rendered model state separate from edits still awaiting a model echo.
   private var lastModelText: String?
+  private var pendingUserTexts: Set<String> = []
+  private var latestUserText: String?
+  private var editGeneration = 0
   func applyModelText(_ value: String) {
-    guard value != lastModelText, markedTextRange == nil else { return }
+    guard markedTextRange == nil else { return }
+    if value == latestUserText {
+      // The model has caught up. A later intentional draft change may now
+      // reuse an earlier value, so do not retain old edits indefinitely.
+      lastModelText = value
+      latestUserText = nil
+      pendingUserTexts.removeAll()
+      return
+    }
+    guard value != lastModelText, !pendingUserTexts.contains(value) else { return }
     lastModelText = value
+    latestUserText = nil
+    pendingUserTexts.removeAll()
     guard text != value else { return }
     let selection = selectedRange
+    let generation = editGeneration
     text = value
-    selectedRange = NSRange(location: min(selection.location, (value as NSString).length), length: 0)
+    if editGeneration == generation {
+      selectedRange = NSRange(location: min(selection.location, (value as NSString).length), length: 0)
+    }
   }
-  func acknowledgeUserText() { lastModelText = text }
+  func acknowledgeUserText() {
+    editGeneration += 1
+    latestUserText = text
+    pendingUserTexts.insert(text ?? "")
+  }
   var blocked: (() -> Void)?
   private(set) var allowsClipboard = false
   func setAccount(_ userID: String?) {
@@ -77,6 +98,14 @@ struct AnswerEditor: UIViewRepresentable {
   func makeUIView(context: Context) -> OwnWordsTextView {
     let view = OwnWordsTextView()
     view.configure()
+    #if DEBUG
+    if model.testing {
+      // Exercise exact input and draft persistence independently of the test
+      // machine's keyboard language and learned spelling corrections.
+      view.autocorrectionType = .no
+      view.spellCheckingType = .no
+    }
+    #endif
     view.isScrollEnabled = false
     let toolbar = UIToolbar()
     toolbar.items = [UIBarButtonItem(systemItem: .flexibleSpace),
