@@ -35,7 +35,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [ios]
+        platform: [ios, mac]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -70,12 +70,7 @@ jobs:
           xcodebuild -project ios/Sabbo.xcodeproj -scheme Sabbo -configuration Debug \
             -destination "platform=iOS Simulator,id=$device_id" \
             CODE_SIGNING_ALLOWED=NO -resultBundlePath /tmp/sabbo-native-results.xcresult \
-            -only-testing:SabboUITests/ResultFlowTests/testWritingResumesQuestionAndKeepsKeyboardNavigationAvailable -only-testing:SabboUITests/ResultFlowTests/testLongAnswersCompareAtTheSameQuestionAndProtectLockedPeers test
-      - name: Collect synthetic editor diagnostic
-        if: always()
-        run: |
-          mkdir -p /tmp/sabbo-ui-evidence
-          find "$HOME/Library/Developer/CoreSimulator/Devices" -name sabbo-input-trace.txt -exec cat {} + > /tmp/sabbo-ui-evidence/input-trace.txt
+            -only-testing:SabboUITests/ResultFlowTests -only-testing:SabboUITests/BonusFlowTests test
       - name: Export native UI evidence
         if: always()
         run: |

@@ -7,6 +7,7 @@ import XCTest
   func testDelayedModelEchoPreservesCursorAndSubsequentTyping() {
     let editor = OwnWordsTextView()
     editor.configure()
+    editor.autocorrectionType = .no
     let prefix = "Jeg sammenligner to "
     editor.applyModelText(prefix)
     editor.selectedRange = NSRange(location: (prefix as NSString).length, length: 0)
@@ -26,6 +27,7 @@ import XCTest
   func testIntermediateEchoIsIgnoredButLaterDraftRollbackStillApplies() {
     let editor = OwnWordsTextView()
     editor.configure()
+    editor.autocorrectionType = .no
     editor.applyModelText("")
     for character in "Jeg" {
       editor.insertText(String(character))
