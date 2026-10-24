@@ -7,7 +7,13 @@ final class OwnWordsTextView: UITextView, UITextPasteDelegate, UITextDropDelegat
   func trace(_ event: String) {
     if ProcessInfo.processInfo.environment["SABBO_UI_TEST"] == "1",
        ProcessInfo.processInfo.environment["SABBO_INPUT_TRACE"] == "1" {
-      NSLog("SABBO_INPUT %@ text=%@ selection=%@", event, text ?? "", NSStringFromRange(selectedRange))
+      let line = "\(event) text=\(text ?? "") selection=\(NSStringFromRange(selectedRange))\n"
+      let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("sabbo-input-trace.txt")
+      if !FileManager.default.fileExists(atPath: url.path) { FileManager.default.createFile(atPath: url.path, contents: nil) }
+      if let file = try? FileHandle(forWritingTo: url) {
+        defer { try? file.close() }
+        try? file.seekToEnd(); try? file.write(contentsOf: Data(line.utf8))
+      }
     }
   }
   override func insertText(_ text: String) {
