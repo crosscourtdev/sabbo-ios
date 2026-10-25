@@ -42,10 +42,10 @@ final class ResultFlowTests: XCTestCase {
     #else
     app.tabBars.buttons["Sammen"].tap()
     #endif
-    let section = app.buttons["missed-sessions"]
+    let section = app.descendants(matching: .any)["missed-sessions"].firstMatch
     XCTAssertTrue(section.waitForExistence(timeout: 5))
     section.tap()
-    let day = app.buttons["missed-day-missed-2026-10-12"]
+    let day = app.descendants(matching: .any)["missed-day-missed-2026-10-12"].firstMatch
     XCTAssertTrue(day.waitForExistence(timeout: 5))
     let list = XCTAttachment(screenshot: app.screenshot())
     list.name = "Missed sessions including never opened"; list.lifetime = .keepAlways; add(list)
@@ -67,8 +67,9 @@ final class ResultFlowTests: XCTestCase {
     app.buttons["result-done"].tap()
     XCTAssertFalse(day.exists)
     // A missed assignment with a draft on another device restores that text.
-    if !app.buttons["missed-day-missed-2026-10-11"].exists { section.tap() }
-    app.buttons["missed-day-missed-2026-10-11"].tap()
+    let draftedDay = app.descendants(matching: .any)["missed-day-missed-2026-10-11"].firstMatch
+    if !draftedDay.exists { section.tap() }
+    draftedDay.tap()
     XCTAssertTrue(editor.waitForExistence(timeout: 5))
     XCTAssertEqual(editor.value as? String, "Utkast fra en annen enhet.")
     app.buttons["Lukk"].tap()

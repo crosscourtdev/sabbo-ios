@@ -264,7 +264,7 @@ struct TogetherView: View {
   }
   @ViewBuilder private var privateDrafts: some View {
     if !unfinished.isEmpty {
-      DisclosureGroup("Ta igjen økter · \(unfinished.count)") {
+      DisclosureGroup {
         Text("Tidligere økter du ikke har levert. Du får karakter og tilbakemelding, men ingen stjerner eller dager på rad.")
           .font(.footnote).foregroundStyle(.secondary).padding(.vertical, 8)
         ForEach(unfinished) { saved in
@@ -282,7 +282,9 @@ struct TogetherView: View {
             }.frame(minHeight: 44).padding(.vertical, 6)
           }.accessibilityIdentifier("missed-day-" + saved.id)
         }
-      }.font(.subheadline).accessibilityIdentifier("missed-sessions")
+      } label: {
+        Text("Ta igjen økter · \(unfinished.count)").accessibilityIdentifier("missed-sessions")
+      }.font(.subheadline)
     }
     if model.local.pending.contains(where: { $0.attempt_id == nil }) {
       DisclosureGroup("Venter på nett") {
