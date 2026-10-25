@@ -32,6 +32,55 @@ final class StudyFlowTests: XCTestCase {
 
 
 final class ResultFlowTests: XCTestCase {
+  func testCompletelyMissedSessionCanBeOpenedWrittenAndQueued() {
+    let app = XCUIApplication()
+    app.launchEnvironment["SABBO_UI_TEST"] = "1"
+    app.launchEnvironment["SABBO_MISSED_FIXTURE"] = "1"
+    app.launch()
+    #if targetEnvironment(macCatalyst)
+    app.staticTexts["Sammen"].firstMatch.tap()
+    #else
+    app.tabBars.buttons["Sammen"].tap()
+    #endif
+    let section = app.buttons["missed-sessions"]
+    XCTAssertTrue(section.waitForExistence(timeout: 5))
+    section.tap()
+    let day = app.buttons["missed-day-missed-2026-10-12"]
+    XCTAssertTrue(day.waitForExistence(timeout: 5))
+    let list = XCTAttachment(screenshot: app.screenshot())
+    list.name = "Missed sessions including never opened"; list.lifetime = .keepAlways; add(list)
+    day.tap()
+    let editor = app.textViews["answer-editor"]
+    XCTAssertTrue(editor.waitForExistence(timeout: 5))
+    XCTAssertEqual(editor.value as? String, "")
+    XCTAssertTrue(app.staticTexts["Du får karakter og tilbakemelding. Sene svar gir ikke stjerner eller dager på rad."].exists)
+    let opened = XCTAttachment(screenshot: app.screenshot())
+    opened.name = "Missed session before writing"; opened.lifetime = .keepAlways; add(opened)
+    editor.tap(); editor.typeText("Jeg sjekker avsenderen.")
+    XCTAssertEqual(editor.value as? String, "Jeg sjekker avsenderen.")
+    app.buttons["next-question"].tap()
+    editor.tap(); editor.typeText("Jeg sammenligner metodene.")
+    app.buttons["next-question"].tap()
+    XCTAssertTrue(app.buttons["submit-session"].waitForExistence(timeout: 5))
+    app.buttons["submit-session"].tap()
+    XCTAssertTrue(app.staticTexts["Åpne appen på nett for å levere."].waitForExistence(timeout: 5))
+    app.buttons["result-done"].tap()
+    XCTAssertFalse(day.exists)
+    // A missed assignment with a draft on another device restores that text.
+    if !app.buttons["missed-day-missed-2026-10-11"].exists { section.tap() }
+    app.buttons["missed-day-missed-2026-10-11"].tap()
+    XCTAssertTrue(editor.waitForExistence(timeout: 5))
+    XCTAssertEqual(editor.value as? String, "Utkast fra en annen enhet.")
+    app.buttons["Lukk"].tap()
+    #if targetEnvironment(macCatalyst)
+    app.staticTexts["I dag"].firstMatch.tap()
+    #else
+    app.tabBars.buttons["I dag"].tap()
+    #endif
+    app.buttons["start-question"].tap()
+    XCTAssertTrue(app.buttons["submit-answer"].waitForExistence(timeout: 5))
+    XCTAssertFalse(app.buttons["next-question"].exists)
+  }
   private func open(_ state: String) -> XCUIApplication {
     let app = XCUIApplication()
     app.launchEnvironment["SABBO_UI_TEST"] = "1"

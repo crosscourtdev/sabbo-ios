@@ -64,6 +64,17 @@
         }
       }
       if let mode = ProcessInfo.processInfo.environment["SABBO_PRESENTATION_FIXTURE"] { installPresentationFixture(mode) }
+      if ProcessInfo.processInfo.environment["SABBO_MISSED_FIXTURE"] == "1" {
+        let first = Question(id: "missed-1", version: 1, subject_id: "pome", goal_ids: [], prompt: "Hvordan undersøker du en kilde?")
+        let second = Question(id: "missed-2", version: 1, subject_id: "pome", goal_ids: [], prompt: "Hva vil du sammenligne?")
+        let question = Question(id: "missed-session", version: 1, subject_id: "pome", goal_ids: [], prompt: "Vurder informasjon.", parts: [first, second], title: "Undersøk kildene")
+        local.missed_days = ["2026-10-12", "2026-10-11"].map { date in
+          let assignment = Assignment(id: "missed-" + date, day: date, timezone: "Europe/Oslo", question_id: question.id, version: 1)
+          return Today(assignment: assignment, question: question, attempt: nil,
+            draft: date == "2026-10-11" ? Draft(revision: 1, body: AnswerSet.encode([first.id: "Utkast fra en annen enhet."]), assisted: 0) : nil,
+            streaks: [], server_day: "2026-10-13")
+        }
+      }
     }
     func presentationFixture(_ assignmentID: String) -> TimelineDay? {
       guard testing, let mode = ProcessInfo.processInfo.environment["SABBO_PRESENTATION_FIXTURE"], mode != "writing",

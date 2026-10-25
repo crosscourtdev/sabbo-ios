@@ -157,6 +157,21 @@ struct TogetherView: View {
   @State private var error: String?
   private var ownID: String { model.session?.user_id ?? "" }
   private var peer: Streak? { model.local.today?.streaks.first { $0.user_id != ownID } }
+  private var unfinished: [Today] {
+    var days = model.local.missed_days ?? []
+    for saved in model.local.saved_days where !days.contains(where: { $0.id == saved.id })
+      && !(model.local.drafts[saved.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+      days.append(saved)
+    }
+    return days.filter { day in
+      day.id != model.local.today?.id
+        && !model.local.history.contains { $0.assignment_id == day.id && $0.mode == "daily" }
+        && !model.local.pending.contains { $0.assignment.id == day.id && $0.mode == "daily" }
+        && (subjectFilter == "all" || day.question.subject_id == subjectFilter)
+        && (search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+          || (day.question.title ?? day.question.prompt).localizedStandardContains(search.trimmingCharacters(in: .whitespacesAndNewlines)))
+    }.sorted { $0.assignment.day > $1.assignment.day }
+  }
   private var visible: [TimelineDay] {
     // Own cached sessions also keep private resets and older history reachable offline.
     var days = sessions
@@ -200,7 +215,7 @@ struct TogetherView: View {
           Button("Prøv igjen") { Task { await load() } }
         }
         if loading && visible.isEmpty { ProgressView() }
-        if !loading && visible.isEmpty {
+        if !loading && visible.isEmpty && (unfinished.isEmpty || (filter != "both" && filter != ownID)) {
           ContentUnavailableView(search.isEmpty && subjectFilter == "all" ? "Ingen økter ennå" : "Ingen treff", systemImage: "magnifyingglass", description: Text(search.isEmpty && subjectFilter == "all" ? "Når dere leverer en økt, finner dere den her." : "Prøv et annet søk eller fag."))
         }
         ForEach(Array(visible.enumerated()), id: \.element.id) { index, day in
@@ -248,21 +263,29 @@ struct TogetherView: View {
       .accessibilityLabel("\(person.stars.total) stjerner")
   }
   @ViewBuilder private var privateDrafts: some View {
-    let drafts = model.local.saved_days.filter { saved in
-      !(model.local.drafts[saved.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        && !model.local.history.contains { $0.assignment_id == saved.id && $0.mode == "daily" }
-        && !model.local.pending.contains { $0.assignment.id == saved.id }
-    }
-    if !drafts.isEmpty || model.local.pending.contains(where: { $0.attempt_id == nil }) {
-      DisclosureGroup("Dine uleverte svar") {
-        ForEach(drafts) { saved in
+    if !unfinished.isEmpty {
+      DisclosureGroup("Ta igjen økter · \(unfinished.count)") {
+        Text("Tidligere økter du ikke har levert. Du får karakter og tilbakemelding, men ingen stjerner eller dager på rad.")
+          .font(.footnote).foregroundStyle(.secondary).padding(.vertical, 8)
+        ForEach(unfinished) { saved in
           NavigationLink {
-            if saved.question.parts != nil { GoalSessionView(day: saved).id(saved.id) }
-            else { SavedDraftView(saved: saved) }
+            CatchUpSessionView(saved: saved)
           } label: {
-            Text(StudyText.day(saved.assignment.day) + " · " + (saved.question.title ?? "Kladd"))
-          }.padding(.vertical, 8)
+            HStack {
+              VStack(alignment: .leading, spacing: 4) {
+                Text(StudyText.day(saved.assignment.day) + " · " + StudyText.subject(saved.question.subject_id))
+                  .font(.caption).foregroundStyle(.secondary)
+                Text(saved.question.title ?? saved.question.prompt).font(.subheadline.bold()).foregroundStyle(.primary)
+              }
+              Spacer()
+              Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+            }.frame(minHeight: 44).padding(.vertical, 6)
+          }.accessibilityIdentifier("missed-day-" + saved.id)
         }
+      }.font(.subheadline).accessibilityIdentifier("missed-sessions")
+    }
+    if model.local.pending.contains(where: { $0.attempt_id == nil }) {
+      DisclosureGroup("Venter på nett") {
         ForEach(model.local.pending.filter { $0.attempt_id == nil }) { pending in
           DisclosureGroup(StudyText.day(pending.assignment.day) + " · Venter på nett") {
             AnswerReview(question: pending.question, answer: pending.answer)
@@ -308,12 +331,57 @@ struct TogetherView: View {
       let feed: TimelineFeed = try await model.api.get("/timeline")
       guard account == ownID, !Task.isCancelled else { return }
       sessions = feed.sessions; error = nil
+      if let missed = feed.missed { model.local.missed_days = missed; model.persist() }
       if let aid = model.sharedAssignmentID {
         selected = try await model.api.get("/timeline/" + aid)
         model.sharedAssignmentID = nil
       }
     } catch { self.error = "Kunne ikke oppdatere. Dine lagrede økter vises fortsatt." }
     loading = false
+  }
+}
+
+/// Opening a past day restores its server draft without replacing today's task.
+struct CatchUpSessionView: View {
+  @EnvironmentObject var model: AppModel
+  let saved: Today
+  @State private var loaded: Today?
+  @State private var failed = false
+  var body: some View {
+    Group {
+      if let day = loaded {
+        if day.question.parts != nil { GoalSessionView(day: day).id(day.id) }
+        else { SavedDraftView(saved: day) }
+      } else if failed {
+        ContentUnavailableView {
+          Label("Kunne ikke åpne økten", systemImage: "wifi.exclamationmark")
+        } description: {
+          Text("Koble til nettet for å hente oppgaven og eventuelle lagrede svar.")
+        } actions: {
+          Button("Prøv igjen") { Task { await load() } }
+        }
+      } else { ProgressView("Henter økten …") }
+    }.task { await load() }
+  }
+  private func load() async {
+    failed = false
+    let account = model.session
+    do {
+      let day: Today
+      if model.testing { day = saved }
+      else { day = try await model.api.get("/assignments/" + saved.id) }
+      guard account?.token == model.session?.token, !Task.isCancelled else { return }
+      model.reconcileDraft(day)
+      model.local.saved_days.removeAll { $0.id == day.id }
+      model.local.saved_days.append(day)
+      model.persist()
+      loaded = day
+    } catch {
+      // Previously opened drafts remain usable offline. Never treat a feed-only
+      // snapshot as a fetched draft: the server may hold work from another device.
+      if let cached = model.local.saved_days.first(where: { $0.id == saved.id }) { loaded = cached }
+      else { failed = true }
+    }
   }
 }
 

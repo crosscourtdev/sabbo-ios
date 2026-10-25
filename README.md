@@ -77,3 +77,5 @@ Edits to different questions merge automatically; overlapping changes show a
 per-question choice with both answers retained. Submission opens that choice
 and then returns to the full answer review. `SABBO_DRAFT_FIXTURE=1` exercises
 this flow with synthetic answers in Debug builds.
+
+Missed daily sessions are available in **Sammen → Ta igjen økter**, including sessions with no saved draft. Opening a past session restores its private draft and leaves today’s task in place. Late submissions receive grades and feedback under the existing deadline rules; they do not automatically earn stars or streak credit.
