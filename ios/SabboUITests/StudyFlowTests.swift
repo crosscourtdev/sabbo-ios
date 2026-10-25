@@ -71,6 +71,10 @@ final class ResultFlowTests: XCTestCase {
     if !draftedDay.exists { section.tap() }
     draftedDay.tap()
     XCTAssertTrue(editor.waitForExistence(timeout: 5))
+    // Resume at the unanswered second part, while retaining the first answer.
+    XCTAssertTrue(app.staticTexts["Hva vil du sammenligne?"].exists)
+    XCTAssertEqual(editor.value as? String, "")
+    app.buttons["Tilbake"].tap()
     XCTAssertEqual(editor.value as? String, "Utkast fra en annen enhet.")
     app.buttons["Lukk"].tap()
     #if targetEnvironment(macCatalyst)
