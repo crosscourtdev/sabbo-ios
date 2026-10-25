@@ -184,6 +184,7 @@ struct LocalState: Codable {
   var bonus_clock_offset: Double? = nil
   var progress: PairProgress? = nil
   var saved_days: [Today] = []
+  var missed_days: [Today]? = nil
   var revisions: [PendingRevision] = []
   var today: Today?
   var drafts: [String: String] = [:]
@@ -406,7 +407,10 @@ struct TimelineDay: Decodable, Identifiable {
   let question: Question
   let people: [TimelinePerson]
 }
-struct TimelineFeed: Decodable { let sessions: [TimelineDay] }
+struct TimelineFeed: Decodable {
+  let sessions: [TimelineDay]
+  var missed: [Today]? = nil
+}
 
 // Presentation policy only. The server must independently authorize every request.
 struct ClientProfile: Decodable {

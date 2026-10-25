@@ -199,6 +199,7 @@ struct GoalSessionView: View {
   var parts: [Question] { day.question.parts ?? [] }
   var draftKey: String { mode == "bonus" ? "bonus-" + (bonusID ?? day.id) : (mode == "optional" ? "practice-" : "") + day.assignment.id }
   var current: Today { model.local.today?.id == day.id ? model.local.today! : day }
+  var isLate: Bool { mode == "daily" && day.assignment.day < max(model.local.today?.server_day ?? "", day.server_day) }
   var pending: Pending? { model.local.pending.last { $0.assignment.id == day.id && $0.mode == mode } }
   var answer: String? { delivered ?? pending?.answer ?? (mode == "daily" ? current.attempt?.answer ?? model.local.history.first(where: { $0.assignment_id == day.id && $0.mode == "daily" })?.answer : nil) }
   var attemptID: String? {
@@ -210,6 +211,13 @@ struct GoalSessionView: View {
       ScrollView {
         VStack(alignment: .leading, spacing: 20) {
           Color.clear.frame(height: 1).id("top")
+          if isLate, answer == nil {
+            VStack(alignment: .leading, spacing: 6) {
+              Label(StudyText.day(day.assignment.day), systemImage: "calendar").font(.headline)
+              Text("Du får karakter og tilbakemelding. Sene svar gir ikke stjerner eller dager på rad.")
+                .font(.footnote).foregroundStyle(.secondary)
+            }.accessibilityIdentifier("late-session-notice")
+          }
           if mode == "daily", !model.answersLocked(day.question) {
             HStack {
               if answer == nil { Text(model.draftStatus).font(.caption).foregroundStyle(.secondary) }
@@ -340,7 +348,7 @@ struct GoalSessionView: View {
           .frame(maxWidth: 620).frame(maxWidth: .infinity)
           .background(.regularMaterial)
       }
-    }.navigationTitle(answer == nil ? (mode == "bonus" ? "Bonusrunde" : "Dagens økt") : "Resultat").navigationBarTitleDisplayMode(.inline)
+    }.navigationTitle(answer == nil ? (mode == "bonus" ? "Bonusrunde" : isLate ? "Ta igjen økt" : "Dagens økt") : "Resultat").navigationBarTitleDisplayMode(.inline)
       .toolbar { if answer == nil { Button("Lukk", systemImage: "xmark") { save(); dismiss() } } }
       .sheet(isPresented: $draftVersions, onDismiss: {
         if answer == nil { raw = model.local.drafts[draftKey] ?? raw }
