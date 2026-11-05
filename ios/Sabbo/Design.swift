@@ -391,7 +391,7 @@ struct SubmissionReceiptView: View {
     if status == "late" {
       VStack(alignment: .leading, spacing: 6) {
         Label("Levert for sent", systemImage: "clock.badge.exclamationmark").font(.subheadline.bold())
-        Text("Fristen var kl. 23:59 den \(StudyText.day(day)). Sen levering gir ikke streak, stjerner eller bonusrunde.")
+        Text("Fristen var kl. 23:59 den \(StudyText.day(day)). Sen levering gir ikke streak eller bonusrunde. Opptjente stjerner vises i resultatet.")
           .font(.footnote)
       }.frame(maxWidth: .infinity, alignment: .leading).padding(14)
         .background(Color.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 14))
