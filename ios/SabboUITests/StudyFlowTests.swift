@@ -125,7 +125,7 @@ extension ResultFlowTests {
     XCTAssertFalse(app.staticTexts["+1 dag i streaken"].exists)
     app.terminate()
   }
-  func testHistoricalLateResultDoesNotInventAnAward() {
+  func testLateResultKeepsGradeAndExplainsMissingRewards() {
     let app = open("late-no-stars")
     XCTAssertTrue(app.staticTexts["Levert for sent"].exists)
     XCTAssertTrue(app.staticTexts["Veiledende karakter 5 av 6"].exists)
