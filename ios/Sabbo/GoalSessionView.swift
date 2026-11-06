@@ -214,7 +214,7 @@ struct GoalSessionView: View {
           if isLate, answer == nil {
             VStack(alignment: .leading, spacing: 6) {
               Label(StudyText.day(day.assignment.day), systemImage: "calendar").font(.headline)
-              Text("Du får karakter og tilbakemelding. Sene svar gir ikke stjerner eller dager på rad.")
+              Text("Du får karakter og tilbakemelding. En gyldig karakter gir like mange stjerner (1–6), én gang per økt. Sene svar gir ikke streak eller bonusrunde.")
                 .font(.footnote).foregroundStyle(.secondary)
             }.accessibilityIdentifier("late-session-notice")
           }

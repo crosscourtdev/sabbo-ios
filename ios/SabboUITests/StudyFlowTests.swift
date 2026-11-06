@@ -53,7 +53,7 @@ final class ResultFlowTests: XCTestCase {
     let editor = app.textViews["answer-editor"]
     XCTAssertTrue(editor.waitForExistence(timeout: 5))
     XCTAssertEqual(editor.value as? String, "")
-    XCTAssertTrue(app.staticTexts["Du får karakter og tilbakemelding. Sene svar gir ikke stjerner eller dager på rad."].exists)
+    XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label == %@", "Du får karakter og tilbakemelding. En gyldig karakter gir like mange stjerner (1–6), én gang per økt. Sene svar gir ikke streak eller bonusrunde.")).firstMatch.exists)
     let opened = XCTAttachment(screenshot: app.screenshot())
     opened.name = "Missed session before writing"; opened.lifetime = .keepAlways; add(opened)
     editor.tap(); editor.typeText("Jeg sjekker avsenderen.")
@@ -117,11 +117,20 @@ final class ResultFlowTests: XCTestCase {
 
 
 extension ResultFlowTests {
-  func testLateResultKeepsGradeAndExplainsMissingRewards() {
+  func testLateResultEarnsStarsWithoutStreakCredit() {
     let app = open("late")
     XCTAssertTrue(app.staticTexts["Levert for sent"].exists)
     XCTAssertTrue(app.staticTexts["Veiledende karakter 5 av 6"].exists)
+    XCTAssertTrue(app.staticTexts["+5 stjerner"].exists)
+    XCTAssertFalse(app.staticTexts["+1 dag i streaken"].exists)
+    app.terminate()
+  }
+  func testLateResultKeepsGradeAndExplainsMissingRewards() {
+    let app = open("late-no-stars")
+    XCTAssertTrue(app.staticTexts["Levert for sent"].exists)
+    XCTAssertTrue(app.staticTexts["Veiledende karakter 5 av 6"].exists)
     XCTAssertFalse(app.staticTexts["+5 stjerner"].exists)
+    XCTAssertFalse(app.staticTexts["+1 dag i streaken"].exists)
   }
   func testApprovedExceptionDoesNotClaimRewardsAreMissing() {
     let app = open("exception")

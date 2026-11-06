@@ -265,7 +265,7 @@ struct TogetherView: View {
   @ViewBuilder private var privateDrafts: some View {
     if !unfinished.isEmpty {
       DisclosureGroup {
-        Text("Tidligere økter du ikke har levert. Du får karakter og tilbakemelding, men ingen stjerner eller dager på rad.")
+        Text("Tidligere økter du ikke har levert. En gyldig karakter gir 1–6 stjerner én gang per økt, men ingen streak eller bonusrunde.")
           .font(.footnote).foregroundStyle(.secondary).padding(.vertical, 8)
         ForEach(unfinished) { saved in
           NavigationLink {
