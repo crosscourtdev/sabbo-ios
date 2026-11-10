@@ -68,7 +68,6 @@ struct DayResultsContent: View {
       } else if stage == "bonus", let latest = bonus.last {
         attempt(latest)
         if currentBonus {
-          BonusPrizeView()
           if ["retry", "grading_failed"].contains(model.bonusStatus) {
             Button("Prøv bonusrunden igjen") { model.openBonus() }.buttonStyle(PlayButton())
           }
@@ -91,8 +90,6 @@ struct DayResultsContent: View {
         attempt(daily)
         if mine {
           QuestGainsView(attemptID: daily.id)
-          AchievementCelebration(attemptID: daily.id)
-          SessionRewardsView()
         }
         if currentBonus {
           Divider()
