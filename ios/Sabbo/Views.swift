@@ -280,8 +280,10 @@ struct TodayView: View {
 
   private var celebrationTrigger: String {
     // Encode the cached snapshot rather than mutating acknowledgement state while rendering.
-    let progress = (try? JSONEncoder().encode(model.local.progress)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
-    let cosmetics = (try? JSONEncoder().encode(model.local.cosmetics)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = .sortedKeys
+    let progress = (try? encoder.encode(model.local.progress)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
+    let cosmetics = (try? encoder.encode(model.local.cosmetics)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
     return "\(visible):\(canCelebrate):\(destination?.id ?? ""):\(model.celebrationScope):\(model.currentAttemptID ?? ""):\(model.bonusStatus):" + progress + cosmetics
   }
 }

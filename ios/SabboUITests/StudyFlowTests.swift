@@ -533,3 +533,22 @@ extension ResultFlowTests {
     XCTAssertFalse(app.buttons["reward-overlay-done"].waitForExistence(timeout: 2))
   }
 }
+
+extension BonusFlowTests {
+  func testRewardOverlayWaitsUntilReturningHome() {
+    let app = XCUIApplication()
+    app.launchEnvironment["SABBO_UI_TEST"] = "1"
+    app.launchEnvironment["SABBO_BONUS_FIXTURE"] = "won"
+    app.launchEnvironment["SABBO_REWARD_OVERLAY_FIXTURE"] = "reset-deferred"
+    app.launch()
+    XCTAssertFalse(app.buttons["reward-overlay-done"].waitForExistence(timeout: 2))
+    #if targetEnvironment(macCatalyst)
+    app.staticTexts["I dag"].firstMatch.tap()
+    #else
+    app.tabBars.buttons["I dag"].tap()
+    #endif
+    XCTAssertTrue(app.buttons["reward-overlay-done"].waitForExistence(timeout: 8))
+    app.buttons["reward-overlay-done"].tap()
+    XCTAssertTrue(app.buttons["start-question"].waitForExistence(timeout: 5))
+  }
+}

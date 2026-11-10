@@ -6,7 +6,7 @@
       guard testing else { return }
       // Separate local account identifier: tests never overwrite a learner's cache.
       session = Session(token: "test-fixture-unusable-token", user_id: "uitest")
-      if ProcessInfo.processInfo.environment["SABBO_REWARD_OVERLAY_FIXTURE"] == "reset" {
+      if ["reset", "reset-deferred"].contains(ProcessInfo.processInfo.environment["SABBO_REWARD_OVERLAY_FIXTURE"] ?? "") {
         for key in UserDefaults.standard.dictionaryRepresentation().keys where
           key.hasPrefix("sabbo.celebrations.uitest") || key.hasPrefix("sabbo.rewards.seen.uitest") || key == "sabbo.achievements.seen.uitest" {
           UserDefaults.standard.removeObject(forKey: key)
@@ -81,6 +81,7 @@
             streaks: [], server_day: "2026-10-13")
         }
       }
+      if ProcessInfo.processInfo.environment["SABBO_REWARD_OVERLAY_FIXTURE"] == "reset-deferred" { selectedTab = "together" }
       if ProcessInfo.processInfo.environment["SABBO_REWARD_OVERLAY_FIXTURE"] == nil {
         // Existing flow fixtures represent rewards already acknowledged on this device.
         acknowledgeCelebration(RewardCelebration(scope: celebrationScope, notices: pendingRewardNotices()))
