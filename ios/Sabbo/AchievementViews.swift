@@ -115,7 +115,7 @@ struct AchievementPreview: View {
   }
   var body: some View {
     if let next {
-      Button(action: open) label: { AchievementRow(achievement: next, compact: true).padding(16) }
+      Button(action: open) { AchievementRow(achievement: next, compact: true).padding(16) }
         .buttonStyle(.plain).background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22))
         .accessibilityIdentifier("achievement-preview")
     }

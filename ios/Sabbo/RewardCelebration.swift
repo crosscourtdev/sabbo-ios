@@ -74,6 +74,8 @@ extension AppModel {
     guard celebration.scope == celebrationScope, let account = session?.user_id else { return }
     RewardNoticeStore().acknowledge(celebration.notices.map(\.id), account: account)
     for notice in celebration.notices {
+      if case .stars = notice.content { _ = collectGain(notice.id) }
+      if case .fire = notice.content { _ = collectGain(notice.id) }
       if case .milestone(let reward) = notice.content { rewardShown(RewardPresentation(reward: reward, access: .earned)) }
     }
   }
