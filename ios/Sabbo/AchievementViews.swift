@@ -4,7 +4,7 @@ struct HomeCounters: View {
   @EnvironmentObject var model: AppModel
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   var openWardrobe: () -> Void
-  @State private var destination: String?
+  var openCollection: (String) -> Void
   var body: some View {
     HStack(spacing: 12) {
       Button(action: openWardrobe) {
@@ -16,8 +16,6 @@ struct HomeCounters: View {
       Spacer(minLength: 0)
       counter("fire", value: model.ownStreak?.current ?? 0, symbol: "flame.fill", color: SabboStyle.orange, label: "dager på rad", flame: flame)
       counter("stars", value: model.ownProgress?.stars.total ?? 0, symbol: "star.fill", color: .yellow, label: "stjerner")
-    }.sheet(isPresented: Binding(get: { destination != nil }, set: { if !$0 { destination = nil } })) {
-      NavigationStack { RewardCollection(stars: destination == "stars") }.desktopSheet()
     }
   }
   /// The flame is dim until today's session is delivered and wiggles from 18:00 while a streak is at risk.
@@ -29,7 +27,7 @@ struct HomeCounters: View {
     return streak.current > 0 && calendar.component(.hour, from: model.bonusNow) >= 18 ? .atRisk : .waiting
   }
   private func counter(_ id: String, value: Int, symbol: String, color: Color, label: String, flame: FlameState = .none) -> some View {
-    CounterChip(value: value, symbol: symbol, color: color, stars: id == "stars", flame: flame) { destination = id }
+    CounterChip(value: value, symbol: symbol, color: color, stars: id == "stars", flame: flame) { openCollection(id) }
       .accessibilityLabel("\(value) \(label)")
       .accessibilityValue(flame == .atRisk ? "Lever i dag for å holde streaken" : flame == .lit ? "Levert i dag" : "")
       .accessibilityHint(id == "stars" ? "Vis stjernegaver og achievements" : "Vis streak og belønningene")
@@ -109,7 +107,7 @@ struct AchievementRow: View {
 
 struct AchievementPreview: View {
   @EnvironmentObject var model: AppModel
-  @State private var expanded = false
+  var open: () -> Void
   private var next: Achievement? {
     model.ownProgress?.achievements?.filter { !$0.earned }.sorted {
       Double($0.progress) / Double($0.target) > Double($1.progress) / Double($1.target)
@@ -117,10 +115,9 @@ struct AchievementPreview: View {
   }
   var body: some View {
     if let next {
-      Button { expanded = true } label: { AchievementRow(achievement: next, compact: true).padding(16) }
+      Button(action: open) { AchievementRow(achievement: next, compact: true).padding(16) }
         .buttonStyle(.plain).background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22))
         .accessibilityIdentifier("achievement-preview")
-        .sheet(isPresented: $expanded) { NavigationStack { RewardCollection(stars: true) }.desktopSheet() }
     }
   }
 }
@@ -169,33 +166,5 @@ struct RewardCollection: View {
     }.background(Color(.systemGroupedBackground)).navigationTitle(stars ? "Stjerner og achievements" : "Streak")
       .navigationBarTitleDisplayMode(.inline)
       .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Ferdig") { dismiss() } } }
-  }
-}
-
-struct AchievementCelebration: View {
-  @EnvironmentObject var model: AppModel
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  var attemptID: String? = nil
-  @State private var dismissed: Set<String> = []
-  private var key: String { "sabbo.achievements.seen." + (model.session?.user_id ?? "") }
-  private var unseen: [Achievement] {
-    let seen = Set(UserDefaults.standard.stringArray(forKey: key) ?? []).union(dismissed)
-    return (model.ownProgress?.achievements ?? []).filter {
-      $0.earned && !seen.contains($0.id) && (attemptID == nil || $0.attempt_id == attemptID)
-    }
-  }
-  var body: some View {
-    ForEach(unseen) { item in
-      VStack(alignment: .leading, spacing: 12) {
-        Text("Achievement låst opp!").font(.caption.bold()).foregroundStyle(Color("AccentColor"))
-        AchievementRow(achievement: item)
-        Button("Herlig!") {
-          dismissed.insert(item.id)
-          let seen = Set(UserDefaults.standard.stringArray(forKey: key) ?? []).union(dismissed)
-          UserDefaults.standard.set(Array(seen), forKey: key)
-        }.font(.subheadline.bold()).frame(minHeight: 44)
-      }.padding(16).background(SabboStyle.mint.opacity(0.5), in: RoundedRectangle(cornerRadius: 20))
-        .transition(reduceMotion ? .identity : .scale.combined(with: .opacity))
-    }
   }
 }

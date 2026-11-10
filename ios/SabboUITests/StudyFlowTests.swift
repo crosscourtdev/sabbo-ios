@@ -484,3 +484,71 @@ extension ResultFlowTests {
     evidence(app, "Large text named criterion")
   }
 }
+
+extension BonusFlowTests {
+  func testRewardsAppearOnceInOverlayAndStayOutOfDailyCard() {
+    let app = XCUIApplication()
+    app.launchEnvironment["SABBO_UI_TEST"] = "1"
+    app.launchEnvironment["SABBO_BONUS_FIXTURE"] = "won"
+    app.launchEnvironment["SABBO_REWARD_OVERLAY_FIXTURE"] = "reset"
+    app.launch()
+    XCTAssertTrue(app.buttons["reward-overlay-done"].waitForExistence(timeout: 8))
+    XCTAssertTrue(app.staticTexts["reward-overlay-stars"].exists)
+    XCTAssertTrue(app.staticTexts["Studious"].exists)
+    let overlay = XCTAttachment(screenshot: app.screenshot())
+    overlay.name = "One-time grouped reward overlay"; overlay.lifetime = .keepAlways; add(overlay)
+    app.buttons["reward-overlay-done"].tap()
+    XCTAssertTrue(app.buttons["start-question"].waitForExistence(timeout: 5))
+    XCTAssertFalse(app.staticTexts["+5 stjerner"].exists)
+    XCTAssertFalse(app.staticTexts["Nytt tilbehør!"].exists)
+    XCTAssertFalse(app.staticTexts["Tilbehør vunnet!"].exists)
+    let home = XCTAttachment(screenshot: app.screenshot())
+    home.name = "Daily card after reward dismissal"; home.lifetime = .keepAlways; add(home)
+    app.terminate()
+    app.launchEnvironment["SABBO_REWARD_OVERLAY_FIXTURE"] = "relaunch"
+    app.launch()
+    XCTAssertTrue(app.buttons["start-question"].waitForExistence(timeout: 8))
+    XCTAssertFalse(app.buttons["reward-overlay-done"].waitForExistence(timeout: 2))
+    app.buttons["avatar-picker"].tap()
+    XCTAssertTrue(app.navigationBars["Mitt tilbehør"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.buttons["Blå caps"].isEnabled)
+  }
+}
+extension ResultFlowTests {
+  func testCatchupStarsUseOneTimeOverlayWithoutStreakOrBonus() {
+    let app = XCUIApplication()
+    app.launchEnvironment["SABBO_UI_TEST"] = "1"
+    app.launchEnvironment["SABBO_RESULT_FIXTURE"] = "late"
+    app.launchEnvironment["SABBO_REWARD_OVERLAY_FIXTURE"] = "reset"
+    app.launch()
+    XCTAssertTrue(app.buttons["reward-overlay-done"].waitForExistence(timeout: 8))
+    XCTAssertTrue(app.staticTexts["reward-overlay-stars"].exists)
+    XCTAssertFalse(app.staticTexts["+1 dag på rad"].exists)
+    XCTAssertFalse(app.buttons["start-bonus"].exists)
+    app.buttons["reward-overlay-done"].tap()
+    app.buttons["start-question"].tap()
+    XCTAssertTrue(app.buttons["result-done"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.staticTexts["+5 stjerner"].exists)
+    app.buttons["result-done"].tap()
+    XCTAssertFalse(app.buttons["reward-overlay-done"].waitForExistence(timeout: 2))
+  }
+}
+
+extension BonusFlowTests {
+  func testRewardOverlayWaitsUntilReturningHome() {
+    let app = XCUIApplication()
+    app.launchEnvironment["SABBO_UI_TEST"] = "1"
+    app.launchEnvironment["SABBO_BONUS_FIXTURE"] = "won"
+    app.launchEnvironment["SABBO_REWARD_OVERLAY_FIXTURE"] = "reset-deferred"
+    app.launch()
+    XCTAssertFalse(app.buttons["reward-overlay-done"].waitForExistence(timeout: 2))
+    #if targetEnvironment(macCatalyst)
+    app.staticTexts["I dag"].firstMatch.tap()
+    #else
+    app.tabBars.buttons["I dag"].tap()
+    #endif
+    XCTAssertTrue(app.buttons["reward-overlay-done"].waitForExistence(timeout: 8))
+    app.buttons["reward-overlay-done"].tap()
+    XCTAssertTrue(app.buttons["start-question"].waitForExistence(timeout: 5))
+  }
+}

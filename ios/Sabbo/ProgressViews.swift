@@ -425,36 +425,3 @@ struct ProgressResetView: View {
       .disabled(busy)
   }
 }
-
-
-/// Earned rewards are an invitation, never a chain of automatic sheets.
-struct SessionRewardsView: View {
-  @EnvironmentObject var model: AppModel
-  @State private var opened: RewardPresentation?
-  @State private var rewards: [RewardPresentation] = []
-  var body: some View {
-    VStack(spacing: 10) {
-      ForEach(rewards) { reward in
-        Button { opened = reward } label: {
-          HStack(spacing: 14) {
-            RewardIcon(reward: reward.reward, unlocked: true, size: 48)
-            VStack(alignment: .leading, spacing: 4) {
-              Text(reward.reward.isStar ? "Ny gave!" : "Ny kiste!").font(.headline)
-              Text(reward.reward.unlockLabel).font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer()
-            Text("Åpne").font(.subheadline.bold())
-          }.padding(14).background(reward.reward.isStar ? Color.purple.opacity(0.12) : SabboStyle.mint, in: RoundedRectangle(cornerRadius: 18))
-        }.buttonStyle(.plain)
-      }
-    }
-    .onAppear { collect() }
-    .onChange(of: model.unopenedRewards.map(\.id)) { _, _ in collect() }
-    .sheet(item: $opened) { reward in
-      StreakRewardView(presentation: reward).onAppear { model.rewardShown(reward) }
-    }
-  }
-  private func collect() {
-    for value in model.unopenedRewards where !rewards.contains(where: { $0.id == value.id }) { rewards.append(value) }
-  }
-}

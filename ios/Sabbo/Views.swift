@@ -80,6 +80,10 @@ struct SabboRoot: View {
       Text(model.message ?? "")
     }
   }
+  private var canCelebrate: Bool {
+    scenePhase == .active && model.selectedTab == "today" && !question && notificationDay == nil
+      && !model.showBonus && model.reward == nil && model.message == nil
+  }
   @ViewBuilder private var navigation: some View {
     #if targetEnvironment(macCatalyst)
     NavigationSplitView {
@@ -95,13 +99,13 @@ struct SabboRoot: View {
         case "subjects": SubjectsView()
         case "together": TogetherView()
         case "settings": SettingsView()
-        default: TodayView(open: { question = true })
+        default: TodayView(canCelebrate: canCelebrate, open: { question = true })
         }
       }.id(model.selectedTab)
     }
     #else
         TabView(selection: $model.selectedTab) {
-          NavigationStack { TodayView(open: { question = true }) }.tabItem {
+          NavigationStack { TodayView(canCelebrate: canCelebrate, open: { question = true }) }.tabItem {
             Label("I dag", systemImage: "house.fill")
           }.tag("today")
           NavigationStack { SubjectsView() }.tabItem { Label("Fag", systemImage: "books.vertical") }.tag("subjects")
@@ -183,15 +187,27 @@ struct ReviewLoginView: View {
 }
 
 struct TodayView: View {
-  @State private var cosmetics = false
+  private enum Destination: Identifiable {
+    case wardrobe, collection(String), celebration(RewardCelebration)
+    var id: String {
+      switch self {
+      case .wardrobe: return "wardrobe"
+      case .collection(let track): return track
+      case .celebration(let value): return value.id.uuidString
+      }
+    }
+  }
+  @State private var destination: Destination?
+  @State private var visible = false
   @EnvironmentObject var model: AppModel
+  var canCelebrate: Bool
   var open: () -> Void
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 24) {
         ClientUpdateNotice()
         if let t = model.local.today {
-          HomeCounters(openWardrobe: { cosmetics = true })
+          HomeCounters(openWardrobe: { destination = .wardrobe }, openCollection: { destination = .collection($0) })
           VStack(alignment: .leading, spacing: 20) {
             HStack {
               SubjectPill(id: t.question.subject_id)
@@ -208,8 +224,6 @@ struct TodayView: View {
                 .font(.system(.title2, design: .rounded, weight: .bold))
                 .foregroundStyle(Color("AccentColor"))
             }
-            if let id = model.currentAttemptID { QuestGainsView(attemptID: id) }
-            AchievementCelebration()
             if model.hasSubmitted, ["ready", "retry", "grading_failed"].contains(model.bonusStatus) {
               Divider()
               BonusStage()
@@ -222,7 +236,7 @@ struct TodayView: View {
                 Image(systemName: model.complete ? "checkmark" : "arrow.right")
               }
             }.buttonStyle(PlayButton()).transaction { $0.animation = nil }.accessibilityIdentifier("start-question")
-            if model.hasSubmitted, model.bonusStatus != "none" { Divider(); BonusStage(showAction: false) }
+            if model.hasSubmitted, !["none", "won", "collection_complete"].contains(model.bonusStatus) { Divider(); BonusStage(showAction: false) }
             }
             if !model.hasSubmitted {
               Text("Lever før kl. 20 for å få en bonusrunde").font(.caption).foregroundStyle(.secondary)
@@ -232,7 +246,7 @@ struct TodayView: View {
             }
           }.padding(22).background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 28))
           ProgressPanel()
-          AchievementPreview()
+          AchievementPreview(open: { destination = .collection("stars") })
 
         } else {
           ContentUnavailableView("Dagens økt", systemImage: "books.vertical", description: Text("Oppdater for å hente oppgavene."))
@@ -240,11 +254,38 @@ struct TodayView: View {
         }
       }.padding(22).frame(maxWidth: 620)
         .frame(maxWidth: .infinity)
-    }.sheet(isPresented: $cosmetics) { CosmeticPicker() }
+    }.sheet(item: $destination) { target in
+      switch target {
+      case .wardrobe: CosmeticPicker()
+      case .collection(let track): NavigationStack { RewardCollection(stars: track == "stars") }.desktopSheet()
+      case .celebration(let value): RewardCelebrationView(celebration: value)
+      }
+    }
+      .onAppear { visible = true }
+      .onDisappear { visible = false }
+      .onChange(of: model.celebrationScope) { _, _ in
+        if case .celebration = destination { destination = nil }
+      }
+      .task(id: celebrationTrigger) {
+        guard visible, canCelebrate, destination == nil else { return }
+        // Let a result/editor dismissal finish before presenting one grouped reward.
+        do { try await Task.sleep(for: .milliseconds(500)) } catch { return }
+        guard !Task.isCancelled, visible, canCelebrate, destination == nil else { return }
+        let notices = model.pendingRewardNotices()
+        if !notices.isEmpty { destination = .celebration(RewardCelebration(scope: model.celebrationScope, notices: notices)) }
+      }
       .background(Color(.systemGroupedBackground))
       .toolbar(.hidden, for: .navigationBar).refreshable { await model.refresh() }
   }
 
+  private var celebrationTrigger: String {
+    // Encode the cached snapshot rather than mutating acknowledgement state while rendering.
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = .sortedKeys
+    let progress = (try? encoder.encode(model.local.progress)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
+    let cosmetics = (try? encoder.encode(model.local.cosmetics)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
+    return "\(visible):\(canCelebrate):\(destination?.id ?? ""):\(model.celebrationScope):\(model.currentAttemptID ?? ""):\(model.bonusStatus):" + progress + cosmetics
+  }
 }
 struct QuestionView: View {
   @EnvironmentObject var model: AppModel

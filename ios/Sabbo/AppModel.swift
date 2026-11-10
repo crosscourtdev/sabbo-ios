@@ -58,6 +58,7 @@ import UserNotifications
       let progress: PairProgress = try await api.get("/progress")
       guard session?.user_id == account else { return }
       local.progress = progress
+      _ = pendingRewardNotices()
       await refreshBonus()
       persist()
     } catch { /* Cached counters remain visible offline. */ }
@@ -131,6 +132,7 @@ import UserNotifications
     session = Vault.read().flatMap { try? JSONDecoder().decode(Session.self, from: $0) }
     restore()
     installTestFixture()
+    _ = pendingRewardNotices()
   }
   func file() -> URL? {
     guard let user = session?.user_id else { return nil }

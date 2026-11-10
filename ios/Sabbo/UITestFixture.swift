@@ -6,7 +6,13 @@
       guard testing else { return }
       // Separate local account identifier: tests never overwrite a learner's cache.
       session = Session(token: "test-fixture-unusable-token", user_id: "uitest")
-      // Each launch replays one-time celebrations, so tests always exercise them.
+      if ["reset", "reset-deferred"].contains(ProcessInfo.processInfo.environment["SABBO_REWARD_OVERLAY_FIXTURE"] ?? "") {
+        for key in UserDefaults.standard.dictionaryRepresentation().keys where
+          key.hasPrefix("sabbo.celebrations.uitest") || key.hasPrefix("sabbo.rewards.seen.uitest") || key == "sabbo.achievements.seen.uitest" {
+          UserDefaults.standard.removeObject(forKey: key)
+        }
+      }
+      // Legacy result effects are isolated from the reward-overlay persistence fixture.
       UserDefaults.standard.removeObject(forKey: "sabbo.gains.uitest")
       let q = Question(
         id: "pome-km11643-1", version: 1, subject_id: "pome", goal_ids: ["KM11643"],
@@ -75,6 +81,11 @@
             streaks: [], server_day: "2026-10-13")
         }
       }
+      if ProcessInfo.processInfo.environment["SABBO_REWARD_OVERLAY_FIXTURE"] == "reset-deferred" { selectedTab = "together" }
+      if ProcessInfo.processInfo.environment["SABBO_REWARD_OVERLAY_FIXTURE"] == nil {
+        // Existing flow fixtures represent rewards already acknowledged on this device.
+        acknowledgeCelebration(RewardCelebration(scope: celebrationScope, notices: pendingRewardNotices()))
+      }
     }
     func presentationFixture(_ assignmentID: String) -> TimelineDay? {
       guard testing, let mode = ProcessInfo.processInfo.environment["SABBO_PRESENTATION_FIXTURE"], mode != "writing",
@@ -128,15 +139,15 @@
       let answer = AnswerSet.encode([part.id: "Jeg undersøker utvalget og metoden."])
       let isLate = ["late", "late-no-stars"].contains(state)
       let attempt = Attempt(id: "fixture-attempt", user_id: "uitest", assignment_id: assignment.id, answer: answer, assessment: "completed", completed_at: "2026-10-16T12:00:00Z", assisted: 0, receipt_status: isLate ? "late" : state == "exception" ? "exception" : "received")
-      let streak = Streak(user_id: "uitest", name: ClientProfile.learnerName, current: isLate ? 0 : 5, best: isLate ? 0 : 5, completed_today: !isLate, week_days: isLate ? 0 : 5, days: [], epoch: UUID().uuidString)
+      let streak = Streak(user_id: "uitest", name: ClientProfile.learnerName, current: isLate ? 0 : 5, best: isLate ? 0 : 5, completed_today: !isLate, week_days: isLate ? 0 : 5, days: [], epoch: ProcessInfo.processInfo.environment["SABBO_REWARD_OVERLAY_FIXTURE"] == nil ? UUID().uuidString : "overlay-fixture")
       local.today = Today(assignment: assignment, question: question, attempt: state == "offline" ? nil : attempt, draft: nil, streaks: [streak], server_day: assignment.day)
       if state == "offline" {
         local.pending = [Pending(id: "fixture-pending", assignment: assignment, question: question, answer: answer, assisted: false, mode: "daily", started_at: "", assessment: "completed", attempt_id: nil)]
       } else {
         evaluations[attempt.id] = Evaluation(status: state == "waiting" ? "processing" : "completed", result: state == "waiting" ? nil : GradeResult(status: "graded", grade: 5, reason: "Du vurderer kilden med relevante fagbegreper.", strengths: "Du undersøker metoden.", improvement: "Forklar også hvordan utvalget påvirker konklusjonen.", criteria: []))
         local.history = [HistoryItem(id: attempt.id, answer: answer, question: question, assignment_id: assignment.id, day: assignment.day, mode: "daily", assessment: "completed", assisted: 0, submitted_at: "2026-10-16T12:00:00Z", revisions: [], evaluations: [evaluations[attempt.id]!], receipt_status: attempt.receipt_status)]
-        local.progress = PairProgress(people: [PersonProgress(streak: streak, stars: Stars(total: isLate ? (state == "late" ? 5 : 0) : 50, epoch: UUID().uuidString, awards: ["waiting", "late-no-stars"].contains(state) ? [] : [StarAward(day: assignment.day, attempt_id: attempt.id, grade: 5, stars: 5)]), fire_attempt_id: isLate ? nil : attempt.id, achievements: [
-          Achievement(id: "studious", title: "Studious", description: "Få karakter 6 på en dagsøkt.", target: 1, progress: 0, stars: 25, symbol: "graduationcap.fill", earned_at: nil, attempt_id: nil),
+        local.progress = PairProgress(people: [PersonProgress(streak: streak, stars: Stars(total: isLate ? (state == "late" ? 5 : 0) : 50, epoch: ProcessInfo.processInfo.environment["SABBO_REWARD_OVERLAY_FIXTURE"] == nil ? UUID().uuidString : "overlay-fixture", awards: ["waiting", "late-no-stars"].contains(state) ? [] : [StarAward(day: assignment.day, attempt_id: attempt.id, grade: 5, stars: 5)]), fire_attempt_id: isLate ? nil : attempt.id, achievements: [
+          Achievement(id: "studious", title: "Studious", description: "Få karakter 6 på en dagsøkt.", target: 1, progress: 0, stars: 25, symbol: "graduationcap.fill", earned_at: ProcessInfo.processInfo.environment["SABBO_REWARD_OVERLAY_FIXTURE"] != nil && !isLate ? "2026-10-16T12:00:00Z" : nil, attempt_id: attempt.id),
           Achievement(id: "smarter_brother", title: "The smarter brother", description: "Få bedre karakter enn \(ClientProfile.ownerName) tre dager på rad.", target: 3, progress: 1, stars: 25, symbol: "bolt.shield.fill", earned_at: nil, attempt_id: nil),
           Achievement(id: "drip_check", title: "Drip check", description: "Bruk tre forskjellige antrekk i dagsoppgavenes illustrasjoner.", target: 3, progress: 2, stars: 25, symbol: "tshirt.fill", earned_at: nil, attempt_id: nil)
         ])])
