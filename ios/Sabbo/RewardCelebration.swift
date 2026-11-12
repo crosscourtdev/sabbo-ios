@@ -106,12 +106,12 @@ struct RewardCelebrationView: View {
         .frame(maxWidth: 520)
         .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 28))
         .shadow(color: .black.opacity(0.15), radius: 24, y: 8)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("reward-overlay-card")
         .padding(20)
         .frame(width: geometry.size.width, height: geometry.size.height)
       }
     }
-    .accessibilityIdentifier("reward-overlay")
     .accessibilityAction(.escape) { dismiss() }
     .onAppear { model.acknowledgeCelebration(celebration); focused = true }
   }
