@@ -526,9 +526,14 @@ extension ResultFlowTests {
     let card = app.descendants(matching: .any)["reward-overlay-card"].firstMatch
     XCTAssertTrue(card.exists)
     let window = app.windows.firstMatch.frame
-    XCTAssertEqual(card.frame.midX, window.midX, accuracy: 30)
-    XCTAssertEqual(card.frame.midY, window.midY, accuracy: 45)
-    XCTAssertLessThan(card.frame.height, window.height * 0.85)
+    // Catalyst exposes the modal's entire accessibility region as the container.
+    // Measure the visible card content from its title through its close button.
+    let title = app.staticTexts["Godt jobbet!"].firstMatch
+    XCTAssertTrue(title.exists)
+    let content = title.frame.union(app.buttons["reward-overlay-done"].frame)
+    XCTAssertEqual(content.midX, window.midX, accuracy: 30)
+    XCTAssertEqual(content.midY, window.midY, accuracy: 45)
+    XCTAssertLessThan(content.height, window.height * 0.85)
     let centered = XCTAttachment(screenshot: app.screenshot())
     centered.name = "Centered compact reward card"; centered.lifetime = .keepAlways; add(centered)
     XCTAssertFalse(app.staticTexts["+1 dag på rad"].exists)
