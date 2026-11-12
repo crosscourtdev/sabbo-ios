@@ -5,18 +5,38 @@ struct HomeCounters: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   var openWardrobe: () -> Void
   var openCollection: (String) -> Void
+  var openNews: () -> Void
   var body: some View {
-    HStack(spacing: 12) {
-      Button(action: openWardrobe) {
-        PlayerAvatar(userID: model.session?.user_id, size: 58)
-          .overlay(alignment: .bottomTrailing) {
-            Image(systemName: "tshirt.fill").font(.caption).padding(5).background(.regularMaterial, in: Circle()).offset(x: 8, y: 8)
-          }.padding(.trailing, 8).padding(.bottom, 8)
-      }.buttonStyle(.plain).accessibilityLabel("Bytt tilbehør").accessibilityIdentifier("avatar-picker")
-      Spacer(minLength: 0)
-      counter("fire", value: model.ownStreak?.current ?? 0, symbol: "flame.fill", color: SabboStyle.orange, label: "dager på rad", flame: flame)
-      counter("stars", value: model.ownProgress?.stars.total ?? 0, symbol: "star.fill", color: .yellow, label: "stjerner")
+    ViewThatFits(in: .horizontal) {
+      HStack(spacing: 10) { avatar; Spacer(minLength: 0); counters }
+      VStack(spacing: 12) {
+        HStack { avatar; Spacer(minLength: 0); newsButton }
+        HStack(spacing: 12) { fireCounter; Spacer(minLength: 0); starsCounter }
+      }
     }
+  }
+  private var avatar: some View {
+    Button(action: openWardrobe) {
+      PlayerAvatar(userID: model.session?.user_id, size: 58)
+        .overlay(alignment: .bottomTrailing) {
+          Image(systemName: "tshirt.fill").font(.caption).padding(5).background(.regularMaterial, in: Circle()).offset(x: 8, y: 8)
+        }.padding(.trailing, 8).padding(.bottom, 8)
+    }.buttonStyle(.plain).accessibilityLabel("Bytt tilbehør").accessibilityIdentifier("avatar-picker")
+  }
+  private var counters: some View {
+    HStack(spacing: 8) { fireCounter; newsButton; starsCounter }.fixedSize(horizontal: true, vertical: false)
+  }
+  private var fireCounter: some View {
+    counter("fire", value: model.ownStreak?.current ?? 0, symbol: "flame.fill", color: SabboStyle.orange, label: "dager på rad", flame: flame)
+  }
+  private var starsCounter: some View {
+    counter("stars", value: model.ownProgress?.stars.total ?? 0, symbol: "star.fill", color: .yellow, label: "stjerner")
+  }
+  private var newsButton: some View {
+    Button(action: openNews) {
+      Image(systemName: "newspaper").font(.title3.bold()).frame(minWidth: 44, minHeight: 48)
+        .background(Color(.secondarySystemGroupedBackground), in: Capsule())
+    }.buttonStyle(.plain).accessibilityLabel("Nyheter").accessibilityIdentifier("home-news")
   }
   /// The flame is dim until today's session is delivered and wiggles from 18:00 while a streak is at risk.
   private var flame: FlameState {

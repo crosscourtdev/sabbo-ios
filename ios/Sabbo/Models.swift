@@ -183,6 +183,7 @@ struct LocalState: Codable {
   var cosmetics: CosmeticCollection? = nil
   var bonus_clock_offset: Double? = nil
   var progress: PairProgress? = nil
+  var news: NewsFeed? = nil
   var saved_days: [Today] = []
   var missed_days: [Today]? = nil
   var revisions: [PendingRevision] = []

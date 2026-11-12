@@ -23,6 +23,10 @@
         id: "fixture-assignment", day: "2026-10-13", timezone: "Europe/Oslo", question_id: q.id,
         version: 1)
       local = LocalState()
+      local.news = NewsFeed(items: [NewsItem(id: "morning-stars-2026-11", published_on: "2026-11-12",
+        title: "Dobbel XP-helg: doble stjerner!",
+        body: "Fredag 13.–søndag 15. november får du doble karakterstjerner når du leverer dagens første økt før kl. 12, norsk tid. Det gjelder én gang hver morgen. Karakter 5 gir for eksempel 10 stjerner i stedet for 5.\n\nSvarene må være mottatt før kl. 12; vurderingen kan komme senere. Eldre økter, bonusrunder og andre belønninger gir vanlige stjerner.",
+        starts_on: "2026-11-13", ends_on: "2026-11-15")])
       local.today = Today(
         assignment: a, question: q, attempt: nil, draft: nil,
         streaks: [
