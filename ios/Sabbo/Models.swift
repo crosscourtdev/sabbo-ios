@@ -172,6 +172,7 @@ struct Pending: Codable, Identifiable {
   let started_at: String
   var assessment: String?
   var attempt_id: String?
+  var client_platform: String? = nil
 }
 struct PendingRevision: Codable, Identifiable {
   let id: String
@@ -184,6 +185,7 @@ struct LocalState: Codable {
   var bonus_clock_offset: Double? = nil
   var progress: PairProgress? = nil
   var news: NewsFeed? = nil
+  var readNewsIDs: [String]? = nil
   var saved_days: [Today] = []
   var missed_days: [Today]? = nil
   var revisions: [PendingRevision] = []

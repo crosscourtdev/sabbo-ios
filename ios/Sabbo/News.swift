@@ -12,7 +12,21 @@ struct NewsItem: Codable, Identifiable {
   var ends_on: String? = nil
 }
 
+extension LocalState {
+  var unreadNewsCount: Int {
+    Set(news?.items.map(\.id) ?? []).subtracting(readNewsIDs ?? []).count
+  }
+  mutating func markNewsRead() {
+    readNewsIDs = Set(readNewsIDs ?? []).union(news?.items.map(\.id) ?? []).sorted()
+  }
+}
+
 extension AppModel {
+  func markNewsRead() {
+    guard session != nil, !storageReadFailed, local.unreadNewsCount > 0 else { return }
+    local.markNewsRead()
+    persist()
+  }
   func refreshNews() async {
     guard !testing, let account = session else { return }
     do {
@@ -56,6 +70,8 @@ struct NewsView: View {
       }.background(Color(.systemGroupedBackground)).navigationTitle("Nyheter")
         .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Ferdig") { dismiss() }.accessibilityIdentifier("news-done") } }
         .refreshable { await model.refreshNews() }
+        .onAppear { model.markNewsRead() }
+        .onChange(of: model.local.news?.items.map(\.id)) { model.markNewsRead() }
         .task { await model.refreshNews(); loading = false }
     }.desktopSheet().accessibilityIdentifier("news-view")
   }

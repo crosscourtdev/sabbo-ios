@@ -10,8 +10,14 @@ struct HomeCounters: View {
     ViewThatFits(in: .horizontal) {
       HStack(spacing: 10) { avatar; Spacer(minLength: 0); counters }
       VStack(spacing: 12) {
-        HStack { avatar; Spacer(minLength: 0); newsButton }
-        HStack(spacing: 12) { fireCounter; Spacer(minLength: 0); starsCounter }
+        HStack { avatar; Spacer(minLength: 0) }
+        ViewThatFits(in: .horizontal) {
+          counters
+          VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) { newsButton; fireCounter }
+            starsCounter
+          }
+        }.frame(maxWidth: .infinity, alignment: .trailing)
       }
     }
   }
@@ -24,7 +30,7 @@ struct HomeCounters: View {
     }.buttonStyle(.plain).accessibilityLabel("Bytt tilbehør").accessibilityIdentifier("avatar-picker")
   }
   private var counters: some View {
-    HStack(spacing: 8) { fireCounter; newsButton; starsCounter }.fixedSize(horizontal: true, vertical: false)
+    HStack(spacing: 8) { newsButton; fireCounter; starsCounter }.fixedSize(horizontal: true, vertical: false)
   }
   private var fireCounter: some View {
     counter("fire", value: model.ownStreak?.current ?? 0, symbol: "flame.fill", color: SabboStyle.orange, label: "dager på rad", flame: flame)
@@ -36,7 +42,18 @@ struct HomeCounters: View {
     Button(action: openNews) {
       Image(systemName: "newspaper").font(.title3.bold()).frame(minWidth: 44, minHeight: 48)
         .background(Color(.secondarySystemGroupedBackground), in: Capsule())
-    }.buttonStyle(.plain).accessibilityLabel("Nyheter").accessibilityIdentifier("home-news")
+        .overlay(alignment: .topTrailing) {
+          if model.local.unreadNewsCount > 0 {
+            Text(model.local.unreadNewsCount > 99 ? "99+" : "\(model.local.unreadNewsCount)")
+              .font(.caption2.bold()).foregroundStyle(.white)
+              .padding(.horizontal, 5).frame(minWidth: 20, minHeight: 20)
+              .background(.red, in: Capsule()).offset(x: 3, y: -3)
+              .accessibilityHidden(true)
+          }
+        }
+    }.buttonStyle(.plain).accessibilityLabel("Nyheter")
+      .accessibilityValue(model.local.unreadNewsCount == 0 ? "Ingen uleste nyheter" : model.local.unreadNewsCount == 1 ? "1 ulest nyhet" : "\(model.local.unreadNewsCount) uleste nyheter")
+      .accessibilityIdentifier("home-news")
   }
   /// The flame is dim until today's session is delivered and wiggles from 18:00 while a streak is at risk.
   private var flame: FlameState {

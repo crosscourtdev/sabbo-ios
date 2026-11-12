@@ -79,3 +79,10 @@ and then returns to the full answer review. `SABBO_DRAFT_FIXTURE=1` exercises
 this flow with synthetic answers in Debug builds.
 
 Missed daily sessions are available in **Sammen → Ta igjen økter**, including sessions with no saved draft. Opening a past session restores its private draft and leaves today’s task in place. Catch-up submissions receive grades and feedback. Compatible backends award 1–6 stars once for a valid grade on newly submitted daily sessions, while late status, streak deadlines and bonus-round deadlines remain unchanged. Previously recorded late results show only awards actually confirmed by the backend.
+
+News appears to the left of the streak counter. Its badge counts unseen news IDs;
+opening the feed marks the displayed feed read. Read IDs persist in the signed-in
+account's local cache, including offline use, and new IDs become unread. This
+state is per device. New hand-ins declare the compiled client platform; queued
+hand-ins preserve that platform through retries. A compatible server can award
+Mac-specific achievements once when accepting a new submission.
