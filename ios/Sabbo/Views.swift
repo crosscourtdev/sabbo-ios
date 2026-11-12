@@ -188,10 +188,11 @@ struct ReviewLoginView: View {
 
 struct TodayView: View {
   private enum Destination: Identifiable {
-    case wardrobe, collection(String), celebration(RewardCelebration)
+    case wardrobe, news, collection(String), celebration(RewardCelebration)
     var id: String {
       switch self {
       case .wardrobe: return "wardrobe"
+      case .news: return "news"
       case .collection(let track): return track
       case .celebration(let value): return value.id.uuidString
       }
@@ -207,7 +208,7 @@ struct TodayView: View {
       VStack(alignment: .leading, spacing: 24) {
         ClientUpdateNotice()
         if let t = model.local.today {
-          HomeCounters(openWardrobe: { destination = .wardrobe }, openCollection: { destination = .collection($0) })
+          HomeCounters(openWardrobe: { destination = .wardrobe }, openCollection: { destination = .collection($0) }, openNews: { destination = .news })
           VStack(alignment: .leading, spacing: 20) {
             HStack {
               SubjectPill(id: t.question.subject_id)
@@ -254,13 +255,23 @@ struct TodayView: View {
         }
       }.padding(22).frame(maxWidth: 620)
         .frame(maxWidth: .infinity)
-    }.sheet(item: $destination) { target in
+    }.sheet(item: Binding<Destination?>(get: {
+      if case .celebration = destination { return nil }
+      return destination
+    }, set: { destination = $0 })) { target in
       switch target {
       case .wardrobe: CosmeticPicker()
+      case .news: NewsView()
       case .collection(let track): NavigationStack { RewardCollection(stars: track == "stars") }.desktopSheet()
-      case .celebration(let value): RewardCelebrationView(celebration: value)
+      case .celebration: EmptyView()
       }
     }
+      .fullScreenCover(item: Binding<RewardCelebration?>(get: {
+        if case .celebration(let value) = destination { return value }
+        return nil
+      }, set: { value in destination = value.map { .celebration($0) } })) { value in
+        RewardCelebrationView(celebration: value).presentationBackground(.clear)
+      }
       .onAppear { visible = true }
       .onDisappear { visible = false }
       .onChange(of: model.celebrationScope) { _, _ in

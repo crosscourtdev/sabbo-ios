@@ -257,6 +257,7 @@ import UserNotifications
       comparison = try await api.get("/assignments/" + today.assignment.id + "/comparison")
       persist()
       await refreshProgress()
+      await refreshNews()
       await registerDevice()
     } catch {
       if (error as? URLError)?.code == .userAuthenticationRequired {

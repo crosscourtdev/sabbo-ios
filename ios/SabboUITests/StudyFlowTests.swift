@@ -523,6 +523,14 @@ extension ResultFlowTests {
     app.launch()
     XCTAssertTrue(app.buttons["reward-overlay-done"].waitForExistence(timeout: 8))
     XCTAssertTrue(app.staticTexts["reward-overlay-stars"].exists)
+    let card = app.descendants(matching: .any)["reward-overlay-card"].firstMatch
+    XCTAssertTrue(card.exists)
+    let window = app.windows.firstMatch.frame
+    XCTAssertEqual(card.frame.midX, window.midX, accuracy: 30)
+    XCTAssertEqual(card.frame.midY, window.midY, accuracy: 45)
+    XCTAssertLessThan(card.frame.height, window.height * 0.85)
+    let centered = XCTAttachment(screenshot: app.screenshot())
+    centered.name = "Centered compact reward card"; centered.lifetime = .keepAlways; add(centered)
     XCTAssertFalse(app.staticTexts["+1 dag på rad"].exists)
     XCTAssertFalse(app.buttons["start-bonus"].exists)
     app.buttons["reward-overlay-done"].tap()
@@ -549,6 +557,44 @@ extension BonusFlowTests {
     #endif
     XCTAssertTrue(app.buttons["reward-overlay-done"].waitForExistence(timeout: 8))
     app.buttons["reward-overlay-done"].tap()
+    XCTAssertTrue(app.buttons["start-question"].waitForExistence(timeout: 5))
+  }
+}
+
+extension ResultFlowTests {
+  func testNewsBesideCountersExplainsMorningEventAndCloses() {
+    let app = XCUIApplication()
+    app.launchEnvironment["SABBO_UI_TEST"] = "1"
+    app.launch()
+    let news = app.buttons["home-news"]
+    XCTAssertTrue(news.waitForExistence(timeout: 5))
+    XCTAssertTrue(app.buttons["home-counter-fire"].exists)
+    XCTAssertTrue(app.buttons["home-counter-stars"].exists)
+    let home = XCTAttachment(screenshot: app.screenshot())
+    home.name = "News beside home counters"; home.lifetime = .keepAlways; add(home)
+    news.tap()
+    XCTAssertTrue(app.staticTexts["Dobbel XP-helg: doble stjerner!"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Fredag 13.–søndag 15. november")).firstMatch.exists)
+    XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "før kl. 12, norsk tid")).firstMatch.exists)
+    let announcement = XCTAttachment(screenshot: app.screenshot())
+    announcement.name = "Morning double stars news"; announcement.lifetime = .keepAlways; add(announcement)
+    app.buttons["news-done"].tap()
+    XCTAssertTrue(news.waitForExistence(timeout: 5))
+    XCTAssertTrue(app.buttons["start-question"].exists)
+  }
+  func testRewardCardKeepsCloseButtonReachableWithLargeText() {
+    let app = XCUIApplication()
+    app.launchEnvironment["SABBO_UI_TEST"] = "1"
+    app.launchEnvironment["SABBO_BONUS_FIXTURE"] = "won"
+    app.launchEnvironment["SABBO_REWARD_OVERLAY_FIXTURE"] = "reset"
+    app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+    app.launch()
+    let done = app.buttons["reward-overlay-done"]
+    XCTAssertTrue(done.waitForExistence(timeout: 8))
+    XCTAssertTrue(done.isHittable)
+    let image = XCTAttachment(screenshot: app.screenshot())
+    image.name = "Reward card with large text"; image.lifetime = .keepAlways; add(image)
+    done.tap()
     XCTAssertTrue(app.buttons["start-question"].waitForExistence(timeout: 5))
   }
 }

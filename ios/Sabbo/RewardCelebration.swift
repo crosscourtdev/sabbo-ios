@@ -93,51 +93,69 @@ struct RewardCelebrationView: View {
     }
   }
   var body: some View {
-    NavigationStack {
-      ScrollView {
-        VStack(alignment: .leading, spacing: 22) {
-          Text("Godt jobbet!").font(.system(.largeTitle, design: .rounded, weight: .heavy))
-            .accessibilityAddTraits(.isHeader).accessibilityFocused($focused)
-          if stars > 0 {
-            Label("+\(stars) stjerner", systemImage: "star.fill").font(.title2.bold())
-              .accessibilityIdentifier("reward-overlay-stars")
-          }
-          ForEach(celebration.notices) { notice in
-            switch notice.content {
-            case .stars: EmptyView()
-            case .fire:
-              Label("+1 dag på rad", systemImage: "flame.fill").font(.headline).foregroundStyle(SabboStyle.orange)
-            case .achievement(let achievement): AchievementRow(achievement: achievement)
-            case .milestone(let reward):
-              HStack(spacing: 16) {
-                RewardIcon(reward: reward, unlocked: true, size: 64)
-                VStack(alignment: .leading, spacing: 6) {
-                  Text(reward.title).font(.headline)
-                  Text(reward.message).font(.subheadline)
-                }
-              }.accessibilityElement(children: .combine)
-            case .cosmetic(let item):
-              HStack(spacing: 16) {
-                CosmeticItemImage(id: item.id, size: 88)
-                VStack(alignment: .leading, spacing: 6) {
-                  Text("Nytt tilbehør!").font(.headline)
-                  Text(item.name)
-                  Text("Du finner det i garderoben.").font(.caption).foregroundStyle(.secondary)
-                }
-              }.accessibilityElement(children: .combine).accessibilityIdentifier("reward-overlay-cosmetic")
-            }
-          }
-          Text("Belønningene dine finner du via tellerne og garderoben.").font(.footnote).foregroundStyle(.secondary)
-        }.padding(24).frame(maxWidth: 560).frame(maxWidth: .infinity, alignment: .center)
+    GeometryReader { geometry in
+      ZStack {
+        Color.black.opacity(0.45).ignoresSafeArea().accessibilityHidden(true)
+        ViewThatFits(in: .vertical) {
+          VStack(spacing: 24) { content; done }.padding(24).fixedSize(horizontal: false, vertical: true)
+          VStack(spacing: 20) {
+            ScrollView { content.padding(.bottom, 4) }
+            done
+          }.padding(24)
+        }
+        .frame(maxWidth: 520)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 28))
+        .shadow(color: .black.opacity(0.15), radius: 24, y: 8)
+        .accessibilityIdentifier("reward-overlay-card")
+        .padding(20)
+        .frame(width: geometry.size.width, height: geometry.size.height)
       }
-      .safeAreaInset(edge: .bottom) {
-        Button("Herlig!") { dismiss() }.buttonStyle(PlayButton()).padding()
-          .background(.regularMaterial).accessibilityIdentifier("reward-overlay-done")
-      }
-      .background(Color(.systemGroupedBackground)).toolbar(.hidden, for: .navigationBar)
     }
-    .desktopSheet()
     .accessibilityIdentifier("reward-overlay")
+    .accessibilityAction(.escape) { dismiss() }
     .onAppear { model.acknowledgeCelebration(celebration); focused = true }
+  }
+  private var done: some View {
+    Button("Herlig!") { dismiss() }.buttonStyle(PlayButton())
+      .accessibilityIdentifier("reward-overlay-done")
+  }
+  private var content: some View {
+    VStack(alignment: .leading, spacing: 22) {
+      VStack(spacing: 12) {
+        Text("Godt jobbet!").font(.system(.largeTitle, design: .rounded, weight: .heavy))
+          .accessibilityAddTraits(.isHeader).accessibilityFocused($focused)
+        if stars > 0 {
+          Label("+\(stars) stjerner", systemImage: "star.fill").font(.title2.bold())
+            .accessibilityIdentifier("reward-overlay-stars")
+        }
+      }.multilineTextAlignment(.center).frame(maxWidth: .infinity)
+      ForEach(celebration.notices) { notice in
+        switch notice.content {
+        case .stars: EmptyView()
+        case .fire:
+          Label("+1 dag på rad", systemImage: "flame.fill").font(.headline).foregroundStyle(SabboStyle.orange)
+        case .achievement(let achievement): AchievementRow(achievement: achievement)
+        case .milestone(let reward):
+          HStack(spacing: 16) {
+            RewardIcon(reward: reward, unlocked: true, size: 64)
+            VStack(alignment: .leading, spacing: 6) {
+              Text(reward.title).font(.headline)
+              Text(reward.message).font(.subheadline)
+            }
+          }.accessibilityElement(children: .combine)
+        case .cosmetic(let item):
+          HStack(spacing: 16) {
+            CosmeticItemImage(id: item.id, size: 88)
+            VStack(alignment: .leading, spacing: 6) {
+              Text("Nytt tilbehør!").font(.headline)
+              Text(item.name)
+              Text("Du finner det i garderoben.").font(.caption).foregroundStyle(.secondary)
+            }
+          }.accessibilityElement(children: .combine).accessibilityIdentifier("reward-overlay-cosmetic")
+        }
+      }
+      Text("Belønningene dine finner du via tellerne og garderoben.").font(.footnote).foregroundStyle(.secondary)
+        .multilineTextAlignment(.center).frame(maxWidth: .infinity)
+    }
   }
 }
