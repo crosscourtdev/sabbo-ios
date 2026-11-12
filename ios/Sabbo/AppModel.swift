@@ -334,7 +334,8 @@ import UserNotifications
       id: UUID().uuidString, assignment: a, question: q, answer: text,
       assisted: local.drafts[a.id + ".assisted"] == "yes", mode: mode,
       started_at: local.drafts[a.id + ".started"] ?? ISO8601DateFormatter().string(from: Date()),
-      assessment: q.parts == nil ? nil : "completed", attempt_id: nil)
+      assessment: q.parts == nil ? nil : "completed", attempt_id: nil,
+      client_platform: ClientRelease.currentPlatform)
     local.pending.append(p)
     guard persist() else {
       local.pending.removeAll { $0.id == p.id }
@@ -416,6 +417,7 @@ import UserNotifications
             "/assignments/" + p.assignment.id + "/attempts",
             body: [
               "answer": p.answer, "key": p.id, "mode": p.mode, "client_started_at": p.started_at,
+              "client_platform": p.client_platform ?? ClientRelease.currentPlatform,
             ])
           id = a.id
           if let i = local.pending.firstIndex(where: { $0.id == p.id }) {
@@ -724,7 +726,7 @@ extension AppModel {
     local.drafts[keyName] = key
     guard persist() else { return nil }
     do {
-      let attempt: Attempt = try await api.send("/bonus/" + roundID + "/attempts", body: ["answer": answer, "key": key])
+      let attempt: Attempt = try await api.send("/bonus/" + roundID + "/attempts", body: ["answer": answer, "key": key, "client_platform": ClientRelease.currentPlatform])
       guard session?.user_id == account else { return nil }
       local.drafts.removeValue(forKey: keyName)
       local.drafts.removeValue(forKey: "bonus-" + roundID)

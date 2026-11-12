@@ -575,6 +575,8 @@ extension ResultFlowTests {
     XCTAssertTrue(news.waitForExistence(timeout: 5))
     XCTAssertTrue(app.buttons["home-counter-fire"].exists)
     XCTAssertTrue(app.buttons["home-counter-stars"].exists)
+    XCTAssertLessThan(news.frame.maxX, app.buttons["home-counter-fire"].frame.minX)
+    XCTAssertEqual(news.value as? String, "1 ulest nyhet")
     let home = XCTAttachment(screenshot: app.screenshot())
     home.name = "News beside home counters"; home.lifetime = .keepAlways; add(home)
     news.tap()
@@ -585,7 +587,29 @@ extension ResultFlowTests {
     announcement.name = "Morning double stars news"; announcement.lifetime = .keepAlways; add(announcement)
     app.buttons["news-done"].tap()
     XCTAssertTrue(news.waitForExistence(timeout: 5))
+    XCTAssertEqual(news.value as? String, "Ingen uleste nyheter")
     XCTAssertTrue(app.buttons["start-question"].exists)
+    news.tap()
+    app.buttons["news-done"].tap()
+    XCTAssertEqual(news.value as? String, "Ingen uleste nyheter")
+  }
+  func testUnreadNewsStaysLeftOfStreakWithLargeText() {
+    let app = XCUIApplication()
+    app.launchEnvironment["SABBO_UI_TEST"] = "1"
+    app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+    app.launch()
+    let news = app.buttons["home-news"], fire = app.buttons["home-counter-fire"]
+    XCTAssertTrue(news.waitForExistence(timeout: 5))
+    XCTAssertTrue(news.isHittable && fire.isHittable)
+    XCTAssertLessThan(news.frame.maxX, fire.frame.minX)
+    XCTAssertEqual(news.value as? String, "1 ulest nyhet")
+    let image = XCTAttachment(screenshot: app.screenshot())
+    image.name = "Unread news left of streak with large text"; image.lifetime = .keepAlways; add(image)
+    news.tap()
+    let done = app.buttons["news-done"]
+    XCTAssertTrue(done.waitForExistence(timeout: 5) && done.isHittable)
+    done.tap()
+    XCTAssertEqual(news.value as? String, "Ingen uleste nyheter")
   }
   func testRewardCardKeepsCloseButtonReachableWithLargeText() {
     let app = XCUIApplication()
