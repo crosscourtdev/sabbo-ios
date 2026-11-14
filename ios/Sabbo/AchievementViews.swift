@@ -212,7 +212,8 @@ struct RewardCollection: View {
             .font(.subheadline).foregroundStyle(.secondary)
         }
       }.padding(22).frame(maxWidth: 620).frame(maxWidth: .infinity)
-    }.background(Color(.systemGroupedBackground)).navigationTitle(stars ? "Stjerner og achievements" : "Streak")
+    }.accessibilityIdentifier("reward-collection")
+      .background(Color(.systemGroupedBackground)).navigationTitle(stars ? "Stjerner og achievements" : "Streak")
       .navigationBarTitleDisplayMode(.inline)
       .onChange(of: model.session?.user_id) { _, _ in showLearner = false }
       .task { await model.refreshProgress() }

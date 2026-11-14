@@ -406,7 +406,9 @@ extension ResultFlowTests {
     reveal(app.staticTexts["Drip check"], app: app)
     XCTAssertTrue(app.staticTexts["2/3"].exists)
     XCTAssertFalse(app.buttons["stars-reward-50"].exists)
-    XCTAssertFalse(app.staticTexts["Egen fremdrift"].exists)
+    let collection = app.descendants(matching: .any)["reward-collection"].firstMatch
+    XCTAssertTrue(collection.exists)
+    XCTAssertFalse(collection.staticTexts["Egen fremdrift"].exists)
     evidence(app, "Read-only peer achievements with large text")
     reveal(person, app: app); person.buttons["Meg"].tap()
     XCTAssertTrue(app.staticTexts["7 stjerner"].exists)
