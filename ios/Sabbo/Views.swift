@@ -55,8 +55,9 @@ struct SabboRoot: View {
         }
       } }
     }
-    .onChange(of: model.session?.user_id) { _, _ in model.reward = nil; resumeNotification() }
+    .onChange(of: model.session?.user_id) { _, _ in model.activeWritingContext = nil; model.reward = nil; resumeNotification() }
     .onChange(of: scenePhase) { _, phase in
+      model.writingPhase(phase)
       if phase == .active {
         Task { await model.checkForUpdate() }
         Task {
@@ -342,7 +343,8 @@ struct QuestionView: View {
               }.font(.subheadline)
             }
           } else {
-            AnswerEditor(text: Binding(get: { model.editor }, set: { model.edit($0) }), blocked: { model.message = "Skriv svaret med egne ord." })
+            AnswerEditor(text: Binding(get: { model.editor }, set: { model.edit($0) }), blocked: { model.message = "Skriv svaret med egne ord." },
+              activity: WritingContext(key: t.assignment.id, questionID: t.question.id))
               .frame(minHeight: 270).accessibilityIdentifier("answer-editor-wrapper")
             Button {
               working = true
@@ -511,6 +513,7 @@ struct SettingsView: View {
       }
       Section {
         PlayerLabel(userID: model.session?.user_id ?? "", name: model.userName)
+        NavigationLink("Personvern") { WritingPrivacyView() }.accessibilityIdentifier("writing-privacy-link")
         NavigationLink("Mine data") { AccountDataView() }
         Button("Logg ut") { Task { await model.signOut() } }
       }
@@ -689,7 +692,8 @@ struct SavedDraftView: View {
             }.buttonStyle(.bordered)
           }
         } else {
-          AnswerEditor(text: $text, blocked: { model.message = "Skriv svaret med egne ord." })
+          AnswerEditor(text: $text, blocked: { model.message = "Skriv svaret med egne ord." },
+            activity: WritingContext(key: saved.assignment.id, questionID: saved.question.id))
             .frame(height: 280)
           Button("Lever svar") {
             working = true

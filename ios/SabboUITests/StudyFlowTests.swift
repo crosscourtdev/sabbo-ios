@@ -32,6 +32,47 @@ final class StudyFlowTests: XCTestCase {
 
 
 final class ResultFlowTests: XCTestCase {
+  func testWritingReportIsOwnerOnlyAndDisclosureIsInSettings() {
+    let app = presentation("owner-review", large: true)
+    #if targetEnvironment(macCatalyst)
+    app.staticTexts["Sammen"].firstMatch.tap()
+    #else
+    app.tabBars.buttons["Sammen"].tap()
+    #endif
+    let day = app.buttons["timeline-day-presentation-day"]
+    XCTAssertTrue(day.waitForExistence(timeout: 5)); day.tap()
+    app.segmentedControls["result-person"].buttons.element(boundBy: 1).tap()
+    let link = app.buttons["writing-activity-link-presentation-peer"]
+    reveal(link, app: app)
+    XCTAssertTrue(link.waitForExistence(timeout: 5)); link.tap()
+    let summary = app.staticTexts["writing-summary"]
+    reveal(summary, app: app)
+    XCTAssertTrue(summary.waitForExistence(timeout: 5))
+    XCTAssertTrue(summary.label.contains("1 avbrudd"))
+    evidence(app, "Owner writing activity report with large text")
+    app.terminate()
+
+    app.launchEnvironment["SABBO_PRESENTATION_FIXTURE"] = "reading"
+    app.launch()
+    XCTAssertFalse(app.descendants(matching: .any)["writing-privacy"].exists)
+    #if targetEnvironment(macCatalyst)
+    app.staticTexts["Sammen"].firstMatch.tap()
+    #else
+    app.tabBars.buttons["Sammen"].tap()
+    #endif
+    XCTAssertTrue(day.waitForExistence(timeout: 5)); day.tap()
+    XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'writing-activity-link-'")).firstMatch.exists)
+    #if targetEnvironment(macCatalyst)
+    app.staticTexts["Innstillinger"].firstMatch.tap()
+    #else
+    app.tabBars.buttons["Innstillinger"].tap()
+    #endif
+    let privacy = app.buttons["writing-privacy-link"]
+    for _ in 0..<8 where !privacy.isHittable { app.swipeUp() }
+    XCTAssertTrue(privacy.waitForExistence(timeout: 5)); privacy.tap()
+    XCTAssertTrue(app.descendants(matching: .any)["writing-privacy"].waitForExistence(timeout: 5))
+    evidence(app, "Settings-only writing activity disclosure")
+  }
   func testCompletelyMissedSessionCanBeOpenedWrittenAndQueued() {
     let app = XCUIApplication()
     app.launchEnvironment["SABBO_UI_TEST"] = "1"

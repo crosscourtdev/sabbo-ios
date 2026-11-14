@@ -95,6 +95,7 @@ struct AnswerEditor: UIViewRepresentable {
   @EnvironmentObject var model: AppModel
   @Binding var text: String
   var blocked: () -> Void
+  var activity: WritingContext? = nil
   func makeUIView(context: Context) -> OwnWordsTextView {
     let view = OwnWordsTextView()
     view.configure()
@@ -109,7 +110,7 @@ struct AnswerEditor: UIViewRepresentable {
     view.isScrollEnabled = false
     view.setAccount(model.session?.user_id)
     view.delegate = context.coordinator
-    view.blocked = blocked
+    view.blocked = { context.coordinator.didBlockPaste() }
     return view
   }
   func updateUIView(_ view: OwnWordsTextView, context: Context) {
@@ -123,12 +124,20 @@ struct AnswerEditor: UIViewRepresentable {
     return CGSize(width: width, height: max(230, size.height))
   }
   func makeCoordinator() -> Coordinator { Coordinator(self) }
+  static func dismantleUIView(_ view: OwnWordsTextView, coordinator: Coordinator) {
+    coordinator.parent.model.endWriting(coordinator.parent.activity)
+  }
   final class Coordinator: NSObject, UITextViewDelegate {
     var parent: AnswerEditor
     init(_ parent: AnswerEditor) { self.parent = parent }
+    func didBlockPaste() {
+      parent.model.blockedWritingPaste(parent.activity, text: parent.text)
+      parent.blocked()
+    }
     func textViewDidChange(_ textView: UITextView) {
       (textView as? OwnWordsTextView)?.acknowledgeUserText()
       parent.text = textView.text
+      parent.model.recordWriting(parent.activity, text: textView.text)
     }
   }
 }

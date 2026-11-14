@@ -121,6 +121,8 @@ import UserNotifications
   private var saveTask: Task<Void, Never>?
   private var syncing = false
   var draftWorkers: [String: Task<Void, Never>] = [:]
+  var activeWritingContext: WritingContext?
+  var writingSyncing = false
   var draftAPIOverride: API?
   @Published var draftStatus = ""
   private var editGeneration = 0
@@ -156,9 +158,14 @@ import UserNotifications
   private(set) var storageReadFailed = false
   func restore() {
     storageReadFailed = false
+    activeWritingContext = nil
     guard let f = file(), FileManager.default.fileExists(atPath: f.path) else { return }
     do {
       local = try LocalRecovery.load(f)
+      for key in Array(local.writingCaptures?.keys ?? Dictionary<String, WritingCapture>().keys) {
+        local.writingCaptures?[key]?.active = false
+        local.writingCaptures?[key]?.lastEdit = nil
+      }
       editor = local.today.flatMap { local.drafts[$0.assignment.id] } ?? ""
     } catch {
       storageReadFailed = true
@@ -227,6 +234,7 @@ import UserNotifications
     do { try await syncPending() } catch {
       message = syncFailureMessage(error)
     }
+    await syncWriting()
     do {
       let generation = editGeneration
       let today: Today = try await API(token: refreshAccount.token).get("/today")
@@ -343,12 +351,14 @@ import UserNotifications
       assisted: local.drafts[a.id + ".assisted"] == "yes", mode: mode,
       started_at: local.drafts[a.id + ".started"] ?? ISO8601DateFormatter().string(from: Date()),
       assessment: q.parts == nil ? nil : "completed", attempt_id: nil,
-      client_platform: ClientRelease.currentPlatform)
+      client_platform: ClientRelease.currentPlatform,
+      writing_activity: mode == "daily" ? writingReceipt(for: a.id) : nil)
     local.pending.append(p)
     guard persist() else {
       local.pending.removeAll { $0.id == p.id }
       return nil
     }
+    if mode == "daily" { retireWriting(a.id); persist() }
     if mode == "daily" { await clearReminders(for: a.id) }
     if let f = bundledFeedback(q) { local.feedback[a.id] = f }
     saveTask?.cancel()
@@ -403,6 +413,7 @@ import UserNotifications
     try await task.value
   }
   private func performPendingSync() async throws {
+    guard let writingAccount = session?.token else { return }
     var failure: Error?
     for r in local.revisions {
       do {
@@ -427,7 +438,9 @@ import UserNotifications
               "answer": p.answer, "key": p.id, "mode": p.mode, "client_started_at": p.started_at,
               "client_platform": p.client_platform ?? ClientRelease.currentPlatform,
             ])
+          guard session?.token == writingAccount else { return }
           id = a.id
+          queueWriting(p.writing_activity, attemptID: a.id)
           if let i = local.pending.firstIndex(where: { $0.id == p.id }) {
             local.pending[i].attempt_id = id
             persist()
@@ -732,10 +745,16 @@ extension AppModel {
     let keyName = "bonus-key-" + roundID
     let key = local.drafts[keyName] ?? UUID().uuidString
     local.drafts[keyName] = key
+    if local.bonusWriting?[roundID] == nil, let receipt = writingReceipt(for: "bonus-" + roundID) {
+      local.bonusWriting = (local.bonusWriting ?? [:]).merging([roundID: receipt]) { _, new in new }
+    }
     guard persist() else { return nil }
     do {
       let attempt: Attempt = try await api.send("/bonus/" + roundID + "/attempts", body: ["answer": answer, "key": key, "client_platform": ClientRelease.currentPlatform])
       guard session?.user_id == account else { return nil }
+      queueWriting(local.bonusWriting?[roundID], attemptID: attempt.id)
+      local.bonusWriting?.removeValue(forKey: roundID)
+      retireWriting("bonus-" + roundID)
       local.drafts.removeValue(forKey: keyName)
       local.drafts.removeValue(forKey: "bonus-" + roundID)
       await refresh()

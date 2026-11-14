@@ -173,6 +173,7 @@ struct Pending: Codable, Identifiable {
   var assessment: String?
   var attempt_id: String?
   var client_platform: String? = nil
+  var writing_activity: WritingReceipt? = nil
 }
 struct PendingRevision: Codable, Identifiable {
   let id: String
@@ -180,6 +181,9 @@ struct PendingRevision: Codable, Identifiable {
   let answer: String
 }
 struct LocalState: Codable {
+  var writingCaptures: [String: WritingCapture]? = nil
+  var pendingWriting: [PendingWritingReceipt]? = nil
+  var bonusWriting: [String: WritingReceipt]? = nil
   var bonus: BonusState? = nil
   var cosmetics: CosmeticCollection? = nil
   var bonus_clock_offset: Double? = nil

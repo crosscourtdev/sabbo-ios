@@ -93,3 +93,15 @@ The owner can also read learner submissions from the shared timeline without
 submitting first, when the authenticated server permits it. Learner answer locks
 and the owner's own bonus locks remain in place. `SABBO_PRESENTATION_FIXTURE=owner-review`
 provides a synthetic owner-without-submission UI fixture.
+
+Writing activity is available to the configured owner beside a learner's submitted
+shared answers. New clients retain sampled word/character counts, estimated typing
+time, inactivity/return observations and blocked paste events. Activity is queued
+locally with the hand-in, uploaded separately after acceptance, and never affects
+answer delivery, grades or rewards. The Settings → Personvern disclosure explains
+the collection and sharing; no disclosure banners or news are inserted elsewhere.
+No answer text, keystroke stream, other app identities or web history is included
+in activity receipts. A compatible server must enforce owner-only reads, learner
+self-writes, pair/shared-attempt boundaries and 30-day retention. Missing activity
+must be presented as unavailable, never as proof of continuous writing. Public UI
+fixtures use synthetic activity, and the report notes clock and coverage limits.
