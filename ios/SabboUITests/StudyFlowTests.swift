@@ -434,11 +434,21 @@ extension ResultFlowTests {
     #if targetEnvironment(macCatalyst)
     toggle.tap()
     #else
+    // iOS can report the switch hittable while it is under the navigation bar.
+    // Return this known top-of-page control to the visible content before tapping.
+    for _ in 0..<8 {
+      let barBottom = app.navigationBars.firstMatch.frame.maxY
+      if toggle.isHittable && toggle.frame.minY > barBottom + 12 { break }
+      activeScroll(app).swipeDown(velocity: .slow)
+    }
+    XCTAssertGreaterThan(toggle.frame.minY, app.navigationBars.firstMatch.frame.maxY + 12)
     toggle.switches.firstMatch.tap()
     #endif
+    let missingAnswer = app.staticTexts["Ikke levert ennå."]
+    reveal(missingAnswer, app: app)
+    XCTAssertTrue(missingAnswer.waitForExistence(timeout: 5))
     reveal(answer, app: app)
     XCTAssertTrue(answer.exists)
-    XCTAssertTrue(app.staticTexts["Ikke levert ennå."].exists)
     evidence(app, "Owner comparison with only learner submitted")
   }
   func testOwnerCanSwitchToReadOnlyPeerAchievements() {
