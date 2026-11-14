@@ -459,7 +459,8 @@ extension ResultFlowTests {
     XCTAssertFalse(collection.staticTexts["Egen fremdrift"].exists)
     evidence(app, "Read-only peer achievements with large text")
     reveal(person, app: app); person.buttons["Meg"].tap()
-    XCTAssertTrue(app.staticTexts["7 stjerner"].exists)
+    reveal(app.staticTexts["7 stjerner"], app: app)
+    XCTAssertTrue(app.staticTexts["7 stjerner"].waitForExistence(timeout: 5))
     XCTAssertTrue(app.buttons["stars-reward-50"].exists)
     XCTAssertFalse(app.staticTexts["Mac debut"].exists)
   }
