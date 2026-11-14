@@ -403,8 +403,9 @@ extension ResultFlowTests {
     XCTAssertTrue(app.staticTexts["42 stjerner"].waitForExistence(timeout: 5))
     XCTAssertTrue(app.staticTexts["Mac debut"].exists)
     XCTAssertTrue(app.staticTexts["Låst opp"].exists)
-    reveal(app.staticTexts["Drip check"], app: app)
-    XCTAssertTrue(app.staticTexts["2/3"].exists)
+    evidence(app, "Peer achievement selector with large text")
+    reveal(app.staticTexts["2/3"], app: app)
+    XCTAssertTrue(app.staticTexts["2/3"].isHittable)
     XCTAssertFalse(app.buttons["stars-reward-50"].exists)
     let collection = app.descendants(matching: .any)["reward-collection"].firstMatch
     XCTAssertTrue(collection.exists)

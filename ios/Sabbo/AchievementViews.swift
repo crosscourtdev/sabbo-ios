@@ -123,22 +123,43 @@ private struct CounterChip: View {
 }
 
 struct AchievementRow: View {
+  @Environment(\.dynamicTypeSize) private var typeSize
   let achievement: Achievement
   var compact = false
   var body: some View {
-    HStack(alignment: .center, spacing: 14) {
-      Image(systemName: achievement.earned ? "checkmark.seal.fill" : achievement.symbol)
-        .font(.title2).foregroundStyle(achievement.earned ? Color("AccentColor") : .secondary)
-        .frame(width: 48, height: 48).background(SabboStyle.mint.opacity(0.4), in: RoundedRectangle(cornerRadius: 15))
-      VStack(alignment: .leading, spacing: 5) {
-        Text(achievement.title).font(.system(.headline, design: .rounded)).foregroundStyle(.primary)
-        if !compact { Text(achievement.description).font(.subheadline).foregroundStyle(.secondary) }
-        Text(achievement.earned ? "Låst opp" : "\(achievement.progress)/\(achievement.target)")
-          .font(.caption.bold()).foregroundStyle(.secondary)
+    Group {
+      if typeSize.isAccessibilitySize {
+        VStack(alignment: .leading, spacing: 14) {
+          HStack { icon; Spacer(minLength: 12); stars }
+          details
+        }
+      } else {
+        HStack(alignment: .center, spacing: 14) {
+          icon
+          details
+          Spacer(minLength: 0)
+          stars
+        }
       }
-      Spacer(minLength: 0)
-      Label("+\(achievement.stars)", systemImage: "star.fill").font(.subheadline.bold()).foregroundStyle(.primary)
     }.accessibilityElement(children: .combine)
+  }
+  private var icon: some View {
+    Image(systemName: achievement.earned ? "checkmark.seal.fill" : achievement.symbol)
+      .font(.title2).foregroundStyle(achievement.earned ? Color("AccentColor") : .secondary)
+      .padding(12).background(SabboStyle.mint.opacity(0.4), in: RoundedRectangle(cornerRadius: 15))
+      .accessibilityHidden(true)
+  }
+  private var details: some View {
+    VStack(alignment: .leading, spacing: 5) {
+      Text(achievement.title).font(.system(.headline, design: .rounded)).foregroundStyle(.primary)
+      if !compact { Text(achievement.description).font(.subheadline).foregroundStyle(.secondary) }
+      Text(achievement.earned ? "Låst opp" : "\(achievement.progress)/\(achievement.target)")
+        .font(.caption.bold()).foregroundStyle(.secondary)
+    }.frame(maxWidth: .infinity, alignment: .leading).fixedSize(horizontal: false, vertical: true)
+  }
+  private var stars: some View {
+    Label("+\(achievement.stars)", systemImage: "star.fill")
+      .font(.subheadline.bold()).foregroundStyle(.primary).fixedSize()
   }
 }
 
