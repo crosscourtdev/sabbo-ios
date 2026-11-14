@@ -7,6 +7,12 @@ struct WritingContext: Equatable {
 
 struct WritingEvent: Codable, Identifiable {
   var id: String { "\(at):\(kind):\(question_id)" }
+  var timestamp: String {
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "nb_NO"); formatter.timeZone = StudyText.oslo
+    formatter.dateFormat = "d. MMM yyyy · HH:mm:ss"
+    return formatter.string(from: Date(timeIntervalSince1970: at))
+  }
   let at: Double
   let kind: String
   let question_id: String
@@ -193,7 +199,7 @@ struct WritingActivityView: View {
           Text("Omtrentlige observasjoner fra Sabbo. Avbrudd viser ikke hvilken app som ble åpnet eller hvorfor. Manglende data er ikke det samme som ingen aktivitet.")
             .font(.subheadline).foregroundStyle(.secondary)
           if let report {
-            Text("Mottatt: " + StudyText.timestamp(report.submitted_at)).font(.subheadline)
+            Text("Mottatt: " + StudyText.timestamp(report.submitted_at) + " · norsk tid").font(.subheadline)
             if report.sessions.isEmpty {
               Text(report.expired ? "Aktivitetsoversikten er utløpt etter 30 dager." : "Ingen skriveaktivitet er mottatt. Besvarelsen kan være fra en eldre app, eller aktiviteten kan vente på synkronisering.")
                 .accessibilityIdentifier("writing-empty")
@@ -223,7 +229,7 @@ struct WritingActivityView: View {
       if receipt.truncated { Text("Lang økt: noen eldre observasjoner er utelatt.").font(.caption) }
       ForEach(Array(receipt.events.enumerated()), id: \.offset) { _, event in
         VStack(alignment: .leading, spacing: 4) {
-          Text(Date(timeIntervalSince1970: event.at), format: .dateTime.day().month().hour().minute().second())
+          Text(event.timestamp)
             .font(.caption).foregroundStyle(.secondary)
           Text(label(event)).font(.subheadline)
         }.frame(maxWidth: .infinity, alignment: .leading)

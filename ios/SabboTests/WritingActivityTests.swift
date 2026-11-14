@@ -2,6 +2,11 @@ import XCTest
 @testable import Sabbo
 
 final class WritingActivityTests: XCTestCase {
+  func testActivityTimestampsFollowNorwegianStudyTime() {
+    let event = WritingEvent(at: 1792489800, kind: "write", question_id: "q", words: 1, characters: 3, writing_seconds: 0)
+    XCTAssertTrue(event.timestamp.hasSuffix("11:50:00"))
+    XCTAssertTrue(event.timestamp.contains("2026"))
+  }
   func testBlockedPasteUsesCurrentQuestionCountsWithoutCountingItAsTyping() {
     var capture = WritingCapture()
     capture.edit("Previous question answer", question: "q1", at: 100)
