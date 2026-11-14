@@ -93,16 +93,16 @@
     }
     func presentationFixture(_ assignmentID: String) -> TimelineDay? {
       guard testing, let mode = ProcessInfo.processInfo.environment["SABBO_PRESENTATION_FIXTURE"], mode != "writing",
-        let today = local.today, today.id == assignmentID, let own = local.history.first else { return nil }
+        let today = local.today, today.id == assignmentID else { return nil }
       let peerResult = Evaluation(status: "complete", result: GradeResult(status: "graded", grade: 4,
         reason: "Et annet perspektiv med gode eksempler.", strengths: "Tydelig sammenligning.", improvement: "Undersøk også begrensningene.",
         criteria: [CriterionResult(criterion_id: "presentation-2.c1", attainment: "partial", evidence: "Jeg sammenligner utvalgene.", comment: "Forklar hva forskjellen betyr.")]))
       let peer = HistoryItem(id: "presentation-peer", answer: AnswerSet.encode(["presentation-1": "Jeg starter med å undersøke hvem som står bak kilden.", "presentation-2": "Jeg sammenligner utvalgene."]), question: today.question,
-        assignment_id: assignmentID, day: own.day, mode: "daily", assessment: "completed", assisted: 0,
-        submitted_at: own.submitted_at, revisions: [], evaluations: [peerResult], answers_locked: mode == "locked")
+        assignment_id: assignmentID, day: today.assignment.day, mode: "daily", assessment: "completed", assisted: 0,
+        submitted_at: "2026-10-20T10:00:00Z", revisions: [], evaluations: [peerResult], answers_locked: mode == "locked")
       return TimelineDay(assignment: today.assignment, question: today.question,
-        people: [TimelinePerson(user_id: "uitest", name: ClientProfile.learnerName, attempts: local.history),
-                 TimelinePerson(user_id: "peer", name: ClientProfile.ownerName, attempts: [peer])])
+        people: [TimelinePerson(user_id: mode == "owner-review" ? ClientProfile.ownerID : "uitest", name: mode == "owner-review" ? ClientProfile.ownerName : ClientProfile.learnerName, attempts: local.history),
+                 TimelinePerson(user_id: mode == "owner-review" ? ClientProfile.learnerID : "peer", name: mode == "owner-review" ? ClientProfile.learnerName : ClientProfile.ownerName, attempts: [peer])])
     }
     private func installPresentationFixture(_ mode: String) {
       installResultFixture("graded")
@@ -135,6 +135,20 @@
         local.progress = PairProgress(people: (local.progress?.people ?? []) + [PersonProgress(streak: peer, stars: Stars(total: 40, epoch: "presentation", awards: []), fire_attempt_id: nil)])
       }
       local.drafts = mode == "writing" ? [a.id: AnswerSet.encode([first.id: longAnswer])] : [:]
+      if mode == "owner-review" {
+        // Hosted UI fixtures use the configured sample identities; no network login.
+        session = Session(token: "test-fixture-unusable-token", user_id: ClientProfile.ownerID)
+        local.history = []
+        local.today = Today(assignment: a, question: q, attempt: nil, draft: nil, streaks: [], server_day: a.day)
+        let owner = Streak(user_id: ClientProfile.ownerID, name: ClientProfile.ownerName, current: 0, best: 0, completed_today: false, week_days: 0, days: [])
+        let learner = Streak(user_id: ClientProfile.learnerID, name: ClientProfile.learnerName, current: 3, best: 3, completed_today: true, week_days: 3, days: [])
+        local.progress = PairProgress(people: [
+          PersonProgress(streak: owner, stars: Stars(total: 7, epoch: "owner-fixture", awards: []), fire_attempt_id: nil,
+            achievements: [Achievement(id: "owner-only", title: "Egen fremdrift", description: "Din egen achievement.", target: 3, progress: 0, stars: 25, symbol: "star", earned_at: nil, attempt_id: nil)]),
+          PersonProgress(streak: learner, stars: Stars(total: 42, epoch: "learner-fixture", awards: []), fire_attempt_id: nil,
+            achievements: [Achievement(id: "peer-earned", title: "Mac debut", description: "Lever på Mac.", target: 1, progress: 1, stars: 25, symbol: "desktopcomputer", earned_at: "2026-10-20T10:00:00Z", attempt_id: "presentation-peer"),
+              Achievement(id: "peer-progress", title: "Drip check", description: "Bruk tre antrekk.", target: 3, progress: 2, stars: 25, symbol: "tshirt", earned_at: nil, attempt_id: nil)])])
+      }
     }
     private func installResultFixture(_ state: String) {
       let part = Question(id: "fixture-part", version: 1, subject_id: "pome", goal_ids: ["fixture"], prompt: "Hvordan undersøker du en kilde?", title: "Kildekritikk", example_answer: "Undersøk avsender og metode.")

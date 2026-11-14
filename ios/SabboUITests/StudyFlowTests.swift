@@ -176,6 +176,7 @@ final class BonusFlowTests: XCTestCase {
     home.name = "Compact quest home"; home.lifetime = .keepAlways; add(home)
     app.buttons["home-counter-stars"].tap()
     XCTAssertTrue(app.navigationBars["Stjerner og achievements"].waitForExistence(timeout: 5))
+    XCTAssertFalse(app.segmentedControls["achievement-person"].exists)
     XCTAssertTrue(app.staticTexts["Studious"].exists)
     XCTAssertTrue(app.staticTexts["Drip check"].exists)
     let rewards = XCTAttachment(screenshot: app.screenshot())
@@ -364,6 +365,53 @@ extension ResultFlowTests {
   private func evidence(_ app: XCUIApplication, _ name: String) {
     let attachment = XCTAttachment(screenshot: app.screenshot())
     attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
+  }
+  func testOwnerReadsPeerAnswerBeforeHandingIn() {
+    let app = presentation("owner-review")
+    #if targetEnvironment(macCatalyst)
+    app.staticTexts["Sammen"].firstMatch.tap()
+    #else
+    app.tabBars.buttons["Sammen"].tap()
+    #endif
+    let day = app.buttons["timeline-day-presentation-day"]
+    XCTAssertTrue(day.waitForExistence(timeout: 5)); day.tap()
+    XCTAssertTrue(app.staticTexts["Dagens økt er ikke levert ennå."].waitForExistence(timeout: 5))
+    let person = app.segmentedControls["result-person"]
+    person.buttons.element(boundBy: 1).tap()
+    let answer = app.staticTexts["Jeg starter med å undersøke hvem som står bak kilden."]
+    reveal(answer, app: app)
+    XCTAssertTrue(answer.exists)
+    evidence(app, "Owner reviews submitted peer answer without own hand-in")
+    let toggle = app.switches["compare-answers"]
+    reveal(toggle, app: app)
+    #if targetEnvironment(macCatalyst)
+    toggle.tap()
+    #else
+    toggle.switches.firstMatch.tap()
+    #endif
+    reveal(answer, app: app)
+    XCTAssertTrue(answer.exists)
+    XCTAssertTrue(app.staticTexts["Ikke levert ennå."].exists)
+    evidence(app, "Owner comparison with only learner submitted")
+  }
+  func testOwnerCanSwitchToReadOnlyPeerAchievements() {
+    let app = presentation("owner-review", large: true)
+    app.buttons["home-counter-stars"].tap()
+    let person = app.segmentedControls["achievement-person"]
+    XCTAssertTrue(person.waitForExistence(timeout: 5))
+    person.buttons.element(boundBy: 1).tap()
+    XCTAssertTrue(app.staticTexts["42 stjerner"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.staticTexts["Mac debut"].exists)
+    XCTAssertTrue(app.staticTexts["Låst opp"].exists)
+    reveal(app.staticTexts["Drip check"], app: app)
+    XCTAssertTrue(app.staticTexts["2/3"].exists)
+    XCTAssertFalse(app.buttons["stars-reward-50"].exists)
+    XCTAssertFalse(app.staticTexts["Egen fremdrift"].exists)
+    evidence(app, "Read-only peer achievements with large text")
+    reveal(person, app: app); person.buttons["Meg"].tap()
+    XCTAssertTrue(app.staticTexts["7 stjerner"].exists)
+    XCTAssertTrue(app.buttons["stars-reward-50"].exists)
+    XCTAssertFalse(app.staticTexts["Mac debut"].exists)
   }
   func testLongAnswersCompareAtTheSameQuestionAndProtectLockedPeers() {
     for mode in ["reading", "locked"] {

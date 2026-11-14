@@ -15,6 +15,14 @@ import UserNotifications
   @Published var selectedTab = "today"
   @Published var sharedAssignmentID: String?
   var ownProgress: PersonProgress? { local.progress?.people.first { $0.id == session?.user_id } }
+  var learnerProgressForOwner: PersonProgress? {
+    guard session?.user_id == ClientProfile.ownerID else { return nil }
+    return local.progress?.people.first { $0.id == ClientProfile.learnerID }
+  }
+  func bonusAnswersLocked(_ question: Question, for personID: String?) -> Bool {
+    if session?.user_id == ClientProfile.ownerID && personID == ClientProfile.learnerID { return false }
+    return answersLocked(question)
+  }
   var ownStreak: Streak? { ownProgress?.streak ?? local.today?.streaks.first { $0.user_id == session?.user_id } }
   private func rewardSeenKey(_ value: StreakReward) -> String {
     let base = "sabbo.rewards.seen." + (session?.user_id ?? "signed-out")

@@ -86,3 +86,10 @@ account's local cache, including offline use, and new IDs become unread. This
 state is per device. New hand-ins declare the compiled client platform; queued
 hand-ins preserve that platform through retries. A compatible server can award
 Mac-specific achievements once when accepting a new submission.
+
+The configured owner can select their learner in the star collection to inspect
+achievement progress and earned stars. This view has no reward-claim actions.
+The owner can also read learner submissions from the shared timeline without
+submitting first, when the authenticated server permits it. Learner answer locks
+and the owner's own bonus locks remain in place. `SABBO_PRESENTATION_FIXTURE=owner-review`
+provides a synthetic owner-without-submission UI fixture.

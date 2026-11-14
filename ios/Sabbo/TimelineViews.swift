@@ -130,9 +130,9 @@ struct DayResultsContent: View {
     if mine {
       EvaluationCard(attemptID: item.id, question: question, showsCriteria: false, feedbackHidden: item.answers_locked == true)
     } else {
-      PeerEvaluation(evaluation: item.evaluations?.last, hidden: item.answers_locked == true || model.answersLocked(question))
+      PeerEvaluation(evaluation: item.evaluations?.last, hidden: item.answers_locked == true || model.bonusAnswersLocked(question, for: person?.id))
     }
-    if model.answersLocked(question) {
+    if model.bonusAnswersLocked(question, for: person?.id) {
       // EvaluationCard also hides its feedback immediately when the timer ends.
       if !mine { BonusAnswersHidden() }
     } else if item.answers_locked == true {
@@ -221,7 +221,7 @@ private struct ComparisonAnswers: View {
           let item = stage == "bonus" ? person.bonusAttempts.last : person.daily
           let mine = person.id == model.session?.user_id
           Text(mine ? "Ditt svar" : person.name + " sitt svar").font(.headline)
-          if model.answersLocked(question) {
+          if model.bonusAnswersLocked(question, for: person.id) {
             BonusAnswersHidden()
           } else if let item {
             if item.answers_locked == true {
