@@ -127,6 +127,12 @@ struct DayResultsContent: View {
   }
   @ViewBuilder private func attempt(_ item: HistoryItem) -> some View {
     SubmissionReceiptView(status: item.receipt_status, day: item.day)
+    if ownID == ClientProfile.ownerID, person?.id == ClientProfile.learnerID, item.mode != "optional" {
+      NavigationLink {
+        WritingActivityView(attemptID: item.id, question: item.question)
+      } label: { Label("Skriveaktivitet", systemImage: "clock.arrow.circlepath") }
+        .accessibilityIdentifier("writing-activity-link-" + item.id)
+    }
     if mine {
       EvaluationCard(attemptID: item.id, question: question, showsCriteria: false, feedbackHidden: item.answers_locked == true)
     } else {

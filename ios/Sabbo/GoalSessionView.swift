@@ -312,7 +312,8 @@ struct GoalSessionView: View {
                 Text("Ditt svar").font(.headline)
                 AnswerEditor(text: Binding(get: { AnswerSet.decode(raw)[part.id] ?? "" }, set: { value in
                   var values = AnswerSet.decode(raw); values[part.id] = value; raw = AnswerSet.encode(values); save()
-                }), blocked: { model.message = "Skriv svaret med egne ord." })
+                }), blocked: { model.message = "Skriv svaret med egne ord." },
+                  activity: mode == "optional" ? nil : WritingContext(key: draftKey, questionID: part.id))
                   .frame(minHeight: 230)
               }.id(part.id)
                 .transition(reduceMotion ? .opacity : .asymmetric(insertion: .opacity.combined(with: .offset(y: 18)), removal: .opacity))
