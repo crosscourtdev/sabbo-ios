@@ -234,7 +234,7 @@ import UserNotifications
     do { try await syncPending() } catch {
       message = syncFailureMessage(error)
     }
-    await syncWriting()
+    Task { await syncWriting() }
     do {
       let generation = editGeneration
       let today: Today = try await API(token: refreshAccount.token).get("/today")

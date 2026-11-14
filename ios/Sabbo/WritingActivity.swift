@@ -211,8 +211,9 @@ struct WritingActivityView: View {
   @ViewBuilder private func session(_ receipt: WritingReceipt) -> some View {
     VStack(alignment: .leading, spacing: 12) {
       Text(receipt.platform == "MAC_OS" ? "Mac" : "iPhone / iPad").font(.headline)
-      let minutes = Int((receipt.events.last?.writing_seconds ?? 0) / 60)
-      Text("Omtrent \(minutes) min aktiv skriving · \(receipt.events.filter { $0.kind == "inactive" }.count) avbrudd · \(receipt.events.filter { $0.kind == "paste" }.count) blokkerte innliminger")
+      let seconds = Int(receipt.events.last?.writing_seconds ?? 0)
+      let duration = seconds < 60 ? "\(seconds) s" : "\(seconds / 60) min \(seconds % 60) s"
+      Text("Omtrent \(duration) aktiv skriving · \(receipt.events.filter { $0.kind == "inactive" }.count) avbrudd · \(receipt.events.filter { $0.kind == "paste" }.count) blokkerte innliminger")
         .font(.subheadline).accessibilityIdentifier("writing-summary")
       Text("Skrivetid teller korte mellomrom mellom tekstendringer, ikke all tid med appen åpen.")
         .font(.caption).foregroundStyle(.secondary)

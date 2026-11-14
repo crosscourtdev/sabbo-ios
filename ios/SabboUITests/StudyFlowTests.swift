@@ -68,7 +68,13 @@ final class ResultFlowTests: XCTestCase {
     app.tabBars.buttons["Innstillinger"].tap()
     #endif
     let privacy = app.buttons["writing-privacy-link"]
-    for _ in 0..<8 where !privacy.isHittable { app.swipeUp() }
+    for _ in 0..<8 where !privacy.isHittable {
+      #if targetEnvironment(macCatalyst)
+      app.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.7)).scroll(byDeltaX: 0, deltaY: -400)
+      #else
+      app.swipeUp()
+      #endif
+    }
     XCTAssertTrue(privacy.waitForExistence(timeout: 5)); privacy.tap()
     XCTAssertTrue(app.descendants(matching: .any)["writing-privacy"].waitForExistence(timeout: 5))
     evidence(app, "Settings-only writing activity disclosure")
