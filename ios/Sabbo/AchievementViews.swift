@@ -123,22 +123,43 @@ private struct CounterChip: View {
 }
 
 struct AchievementRow: View {
+  @Environment(\.dynamicTypeSize) private var typeSize
   let achievement: Achievement
   var compact = false
   var body: some View {
-    HStack(alignment: .center, spacing: 14) {
-      Image(systemName: achievement.earned ? "checkmark.seal.fill" : achievement.symbol)
-        .font(.title2).foregroundStyle(achievement.earned ? Color("AccentColor") : .secondary)
-        .frame(width: 48, height: 48).background(SabboStyle.mint.opacity(0.4), in: RoundedRectangle(cornerRadius: 15))
-      VStack(alignment: .leading, spacing: 5) {
-        Text(achievement.title).font(.system(.headline, design: .rounded)).foregroundStyle(.primary)
-        if !compact { Text(achievement.description).font(.subheadline).foregroundStyle(.secondary) }
-        Text(achievement.earned ? "Låst opp" : "\(achievement.progress)/\(achievement.target)")
-          .font(.caption.bold()).foregroundStyle(.secondary)
+    Group {
+      if typeSize.isAccessibilitySize {
+        VStack(alignment: .leading, spacing: 14) {
+          HStack { icon; Spacer(minLength: 12); stars }
+          details
+        }
+      } else {
+        HStack(alignment: .center, spacing: 14) {
+          icon
+          details
+          Spacer(minLength: 0)
+          stars
+        }
       }
-      Spacer(minLength: 0)
-      Label("+\(achievement.stars)", systemImage: "star.fill").font(.subheadline.bold()).foregroundStyle(.primary)
     }.accessibilityElement(children: .combine)
+  }
+  private var icon: some View {
+    Image(systemName: achievement.earned ? "checkmark.seal.fill" : achievement.symbol)
+      .font(.title2).foregroundStyle(achievement.earned ? Color("AccentColor") : .secondary)
+      .padding(12).background(SabboStyle.mint.opacity(0.4), in: RoundedRectangle(cornerRadius: 15))
+      .accessibilityHidden(true)
+  }
+  private var details: some View {
+    VStack(alignment: .leading, spacing: 5) {
+      Text(achievement.title).font(.system(.headline, design: .rounded)).foregroundStyle(.primary)
+      if !compact { Text(achievement.description).font(.subheadline).foregroundStyle(.secondary) }
+      Text(achievement.earned ? "Låst opp" : "\(achievement.progress)/\(achievement.target)")
+        .font(.caption.bold()).foregroundStyle(.secondary)
+    }.frame(maxWidth: .infinity, alignment: .leading).fixedSize(horizontal: false, vertical: true)
+  }
+  private var stars: some View {
+    Label("+\(achievement.stars)", systemImage: "star.fill")
+      .font(.subheadline.bold()).foregroundStyle(.primary).fixedSize()
   }
 }
 
@@ -163,32 +184,44 @@ struct RewardCollection: View {
   @EnvironmentObject var model: AppModel
   @Environment(\.dismiss) private var dismiss
   let stars: Bool
+  @State private var showLearner = false
+  private var peer: PersonProgress? { model.learnerProgressForOwner }
+  private var viewingPeer: Bool { showLearner && peer != nil }
+  private var progress: PersonProgress? { viewingPeer ? peer : model.ownProgress }
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 24) {
         if stars {
-          Label("\(model.ownProgress?.stars.total ?? 0) stjerner", systemImage: "star.fill")
-            .font(.system(.largeTitle, design: .rounded, weight: .heavy))
-          if let next = StreakReward.starMilestones.first(where: { $0.threshold > (model.ownProgress?.stars.total ?? 0) }) {
-            Text("\(next.threshold - (model.ownProgress?.stars.total ?? 0)) stjerner til neste gave").foregroundStyle(.secondary)
+          if let peer {
+            Picker("Person", selection: $showLearner) {
+              Text("Meg").tag(false)
+              Text(peer.streak.name).tag(true)
+            }.pickerStyle(.segmented).accessibilityIdentifier("achievement-person")
           }
-          HStack {
-            ForEach(StreakReward.starMilestones) { reward in
-              NavigationLink {
-                let presentation = reward.presentation(userID: model.session?.user_id, best: model.rewardValue(reward))
-                StreakRewardView(presentation: presentation).onAppear { model.rewardShown(presentation) }
-              } label: {
-                VStack(spacing: 8) {
-                  RewardIcon(reward: reward, unlocked: model.rewardValue(reward) >= reward.threshold, size: 56)
-                  Text("\(reward.threshold) ★").font(.headline).foregroundStyle(.primary)
-                }.frame(maxWidth: .infinity).padding(.vertical, 12)
-              }.buttonStyle(.plain).accessibilityIdentifier("stars-reward-\(reward.threshold)")
-                .accessibilityLabel("Stjernegave, \(reward.threshold) stjerner")
+          Label("\(progress?.stars.total ?? 0) stjerner", systemImage: "star.fill")
+            .font(.system(.largeTitle, design: .rounded, weight: .heavy))
+          if !viewingPeer {
+            if let next = StreakReward.starMilestones.first(where: { $0.threshold > (model.ownProgress?.stars.total ?? 0) }) {
+              Text("\(next.threshold - (model.ownProgress?.stars.total ?? 0)) stjerner til neste gave").foregroundStyle(.secondary)
+            }
+            HStack {
+              ForEach(StreakReward.starMilestones) { reward in
+                NavigationLink {
+                  let presentation = reward.presentation(userID: model.session?.user_id, best: model.rewardValue(reward))
+                  StreakRewardView(presentation: presentation).onAppear { model.rewardShown(presentation) }
+                } label: {
+                  VStack(spacing: 8) {
+                    RewardIcon(reward: reward, unlocked: model.rewardValue(reward) >= reward.threshold, size: 56)
+                    Text("\(reward.threshold) ★").font(.headline).foregroundStyle(.primary)
+                  }.frame(maxWidth: .infinity).padding(.vertical, 12)
+                }.buttonStyle(.plain).accessibilityIdentifier("stars-reward-\(reward.threshold)")
+                  .accessibilityLabel("Stjernegave, \(reward.threshold) stjerner")
+              }
             }
           }
-          Label("Achievements", systemImage: "trophy.fill")
+          Label(viewingPeer ? "\(peer?.streak.name ?? "") sine achievements" : "Achievements", systemImage: "trophy.fill")
             .font(.system(.title2, design: .rounded, weight: .bold))
-          ForEach(model.ownProgress?.achievements ?? []) { item in
+          ForEach(progress?.achievements ?? []) { item in
             AchievementRow(achievement: item).padding(16)
               .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22))
           }
@@ -200,8 +233,11 @@ struct RewardCollection: View {
             .font(.subheadline).foregroundStyle(.secondary)
         }
       }.padding(22).frame(maxWidth: 620).frame(maxWidth: .infinity)
-    }.background(Color(.systemGroupedBackground)).navigationTitle(stars ? "Stjerner og achievements" : "Streak")
+    }.accessibilityIdentifier("reward-collection")
+      .background(Color(.systemGroupedBackground)).navigationTitle(stars ? "Stjerner og achievements" : "Streak")
       .navigationBarTitleDisplayMode(.inline)
+      .onChange(of: model.session?.user_id) { _, _ in showLearner = false }
+      .task { await model.refreshProgress() }
       .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Ferdig") { dismiss() } } }
   }
 }

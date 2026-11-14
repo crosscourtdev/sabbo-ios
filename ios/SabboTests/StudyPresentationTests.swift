@@ -47,4 +47,29 @@ final class StudyPresentationTests: XCTestCase {
     XCTAssertEqual(StudyPresentation.sourceTitle(one), "Study methods")
     XCTAssertNotEqual(StudyPresentation.sourceTitle(one), StudyPresentation.sourceTitle(two))
   }
+  @MainActor func testOwnerReviewOnlyBypassesPeerBonusLockAndProgressSelectionIsAccountScoped() {
+    let model = AppModel()
+    model.local = LocalState()
+    model.session = Session(token: "unit-test", user_id: ClientProfile.ownerID)
+    let q = part("review")
+    let now = Date(); model.bonusClock = now
+    let date = ISO8601DateFormatter()
+    model.local.bonus = BonusState(id: "bonus", status: "ready", server_now: date.string(from: now),
+      day: "2026-10-20", cutoff: "20:00", question_id: q.id, question_version: q.version,
+      opens_at: date.string(from: now.addingTimeInterval(-60)), expires_at: date.string(from: now.addingTimeInterval(3600)), target_grade: 5)
+    XCTAssertTrue(model.answersLocked(q))
+    XCTAssertTrue(model.bonusAnswersLocked(q, for: ClientProfile.ownerID))
+    XCTAssertFalse(model.bonusAnswersLocked(q, for: ClientProfile.learnerID))
+    XCTAssertTrue(model.bonusAnswersLocked(q, for: "unrelated"))
+    let learner = Streak(user_id: ClientProfile.learnerID, name: "Learner", current: 2, best: 2, completed_today: true, week_days: 2, days: [])
+    model.local.progress = PairProgress(people: [PersonProgress(streak: learner, stars: Stars(total: 42, epoch: "peer", awards: []), fire_attempt_id: nil)])
+    XCTAssertEqual(model.learnerProgressForOwner?.stars.total, 42)
+    XCTAssertNil(model.ownProgress)
+    model.session = Session(token: "unit-test", user_id: ClientProfile.learnerID)
+    XCTAssertNil(model.learnerProgressForOwner)
+    XCTAssertTrue(model.bonusAnswersLocked(q, for: ClientProfile.ownerID))
+    model.session = nil
+    XCTAssertNil(model.learnerProgressForOwner)
+  }
+
 }
