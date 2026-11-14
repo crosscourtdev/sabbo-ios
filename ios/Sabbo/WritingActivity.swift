@@ -67,6 +67,13 @@ struct WritingCapture: Codable {
       active = false; lastEdit = nil; lastSample = nil
     } else if kind == "active" { active = true }
   }
+  mutating func blockedPaste(_ text: String, question: String, at time: Double) {
+    questionID = question
+    words = text.split(whereSeparator: { $0.isWhitespace || $0.isNewline }).count
+    characters = text.count
+    lastEdit = nil
+    append("paste", at: time)
+  }
 }
 
 struct PendingWritingReceipt: Codable {
@@ -99,15 +106,11 @@ extension AppModel {
   }
   func blockedWritingPaste(_ context: WritingContext?, text: String) {
     guard recordsWriting, let context else { return }
-    if local.writingCaptures?[context.key] == nil {
-      var capture = WritingCapture(); capture.questionID = context.questionID
-      capture.words = text.split(whereSeparator: { $0.isWhitespace }).count
-      capture.characters = text.count
-      local.writingCaptures = (local.writingCaptures ?? [:]).merging([context.key: capture]) { _, new in new }
-    }
+    if let previous = activeWritingContext, previous != context { endWriting(previous) }
     activeWritingContext = context
-    local.writingCaptures?[context.key]?.questionID = context.questionID
-    local.writingCaptures?[context.key]?.append("paste", at: Date().timeIntervalSince1970)
+    var capture = local.writingCaptures?[context.key] ?? WritingCapture()
+    capture.blockedPaste(text, question: context.questionID, at: Date().timeIntervalSince1970)
+    local.writingCaptures = (local.writingCaptures ?? [:]).merging([context.key: capture]) { _, new in new }
     persist()
   }
   func endWriting(_ context: WritingContext?) {

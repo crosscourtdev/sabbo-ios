@@ -2,6 +2,16 @@ import XCTest
 @testable import Sabbo
 
 final class WritingActivityTests: XCTestCase {
+  func testBlockedPasteUsesCurrentQuestionCountsWithoutCountingItAsTyping() {
+    var capture = WritingCapture()
+    capture.edit("Previous question answer", question: "q1", at: 100)
+    capture.blockedPaste("", question: "q2", at: 102)
+    XCTAssertEqual(capture.receipt.events.last?.question_id, "q2")
+    XCTAssertEqual(capture.receipt.events.last?.words, 0)
+    XCTAssertEqual(capture.receipt.events.last?.characters, 0)
+    capture.edit("Own", question: "q2", at: 103)
+    XCTAssertEqual(capture.writingSeconds, 0)
+  }
   func testSamplingRecordsCountsWithoutTextAndExcludesLongPauses() throws {
     var capture = WritingCapture()
     capture.edit("Private draft sentinel", question: "q1", at: 100)
