@@ -77,12 +77,11 @@ struct QuestionPrompt: View {
   @EnvironmentObject var model: AppModel
   let question: Question
   @State private var copyID: UUID?
-  private var allowsCopy: Bool { model.session?.user_id != ClientProfile.learnerID || question.subject_id != "reli" }
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
       Text(question.displayPrompt).fixedSize(horizontal: false, vertical: true)
         .accessibilityIdentifier("question-prompt-" + question.id)
-      if allowsCopy {
+      if model.session?.user_id != ClientProfile.learnerID || question.subject_id != "pome" {
         Button {
           UIPasteboard.general.string = question.voicePracticePrompt
           copyID = UUID()
