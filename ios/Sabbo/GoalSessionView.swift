@@ -77,22 +77,19 @@ struct QuestionPrompt: View {
   @EnvironmentObject var model: AppModel
   let question: Question
   @State private var copyID: UUID?
-  private var allowsCopy: Bool { model.session?.user_id != ClientProfile.learnerID || question.subject_id != "reli" }
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
       Text(question.displayPrompt).fixedSize(horizontal: false, vertical: true)
         .accessibilityIdentifier("question-prompt-" + question.id)
-      if allowsCopy {
-        Button {
-          UIPasteboard.general.string = question.voicePracticePrompt
-          copyID = UUID()
-          UIAccessibility.post(notification: .announcement, argument: "Oppgaven og instruksen for talemodus er kopiert")
-        } label: {
-          Label(copyID == nil ? "Kopier til talemodus" : "Kopiert", systemImage: copyID == nil ? "doc.on.doc" : "checkmark")
-            .font(.subheadline).frame(minHeight: 44)
-        }.buttonStyle(.borderless)
-          .accessibilityHint("Kopierer oppgaven, materialet og instruksen for muntlig øving.")
-      }
+      Button {
+        UIPasteboard.general.string = question.voicePracticePrompt
+        copyID = UUID()
+        UIAccessibility.post(notification: .announcement, argument: "Oppgaven og instruksen for talemodus er kopiert")
+      } label: {
+        Label(copyID == nil ? "Kopier til talemodus" : "Kopiert", systemImage: copyID == nil ? "doc.on.doc" : "checkmark")
+          .font(.subheadline).frame(minHeight: 44)
+      }.buttonStyle(.borderless)
+        .accessibilityHint("Kopierer oppgaven, materialet og instruksen for muntlig øving.")
     }.onChange(of: question.id) { _, _ in copyID = nil }
       .onChange(of: model.session?.user_id) { _, _ in copyID = nil }
       .task(id: copyID) {
