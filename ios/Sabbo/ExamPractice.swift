@@ -12,8 +12,8 @@ private struct ExamRound: Decodable {
     let result: GradeResult?
   }
   struct Milestone: Decodable {
-    let title: String
-    let threshold, stars, run, best: Int
+    let id: String
+    let threshold, stars, run: Int
     let earned: Bool
   }
   let title: String
@@ -25,6 +25,8 @@ private struct ExamRound: Decodable {
 }
 
 struct ExamPractice: View {
+  let canCelebrate: Bool
+  @State private var celebration: RewardCelebration?
   @EnvironmentObject var model: AppModel
   @State private var round: ExamRound?
   @State private var answer = ""
@@ -34,64 +36,49 @@ struct ExamPractice: View {
 
   var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 18) {
-        if let round { Text(round.title).font(.headline) }
+      VStack(alignment: .leading, spacing: 20) {
         if let round {
           if let card = round.card {
-            TimelineView(.periodic(from: .now, by: 1)) { timeline in
-              let seconds = max(0, Int(ceil(card.deadline - timeline.date.timeIntervalSince1970)))
-              VStack(alignment: .leading, spacing: 16) {
-                Text(String(format: "%d:%02d", seconds / 60, seconds % 60))
-                  .font(.largeTitle.monospacedDigit()).accessibilityLabel("Tid igjen: " + String(seconds) + " sekunder")
-                QuestionPrompt(question: card.question)
-                QuestionMaterials(question: card.question)
-                AnswerEditor(text: Binding(get: { answer }, set: {
-                  answer = String($0.prefix(6000))
-                  UserDefaults.standard.set(["id": card.id, "base": card.answer, "answer": answer], forKey: draftKey)
-                }), blocked: { message = "Skriv svaret med egne ord." })
-                  .frame(minHeight: 230)
-                  .disabled(seconds == 0)
-                Button("Lever svar") { Task { await update("submit") } }
-                  .buttonStyle(.borderedProminent).disabled(busy || seconds == 0 || answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-              }
-            }
-            Button("Avbryt oppgaven") { confirmSkip = true }.disabled(busy)
+            writing(card)
           } else {
-            if let last = round.history.first {
-              Text(last.title).font(.headline)
-              feedback(last)
-            } else {
-              Text("Skriv ett svar på tre minutter. Oppgaver du strever med kommer tilbake oftere.")
-            }
-            Text("\(round.practiced) av \(round.total) oppgaver øvd").foregroundStyle(.secondary)
-            if round.available {
-              Button(round.history.isEmpty ? "Start · 3 minutter" : "Neste oppgave · 3 minutter") {
-                Task { await update("start") }
-              }.buttonStyle(.borderedProminent).disabled(busy)
-            } else {
-              Text("Ingen nye oppgaver akkurat nå.").foregroundStyle(.secondary)
-            }
-            ForEach(round.milestones, id: \.threshold) { m in
-              VStack(alignment: .leading) {
-                Label("\(m.title) · \(m.stars) stjerner", systemImage: m.earned ? "star.fill" : "star")
-                Text("Karakter \(m.threshold)+ · \(m.run) på rad · rekord \(m.best) · mål 3").font(.caption)
-              }
-            }
-            if round.history.count > 1 {
-              DisclosureGroup("Tidligere oppgaver") {
-                ForEach(round.history.dropFirst()) { item in
-                  DisclosureGroup(item.title) { feedback(item) }
-                }
-              }
-            }
+            practiceSummary(round)
           }
         } else if message == nil { ProgressView() }
         if let message {
           Text(message).foregroundStyle(.secondary)
           Button("Oppdater") { Task { await update() } }.disabled(busy)
         }
-      }.padding().frame(maxWidth: 740).frame(maxWidth: .infinity)
-    }.navigationTitle("Eksamen")
+      }.padding(20).frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)
+    }
+      .background(Color(.systemGroupedBackground))
+      .navigationTitle("Øving")
+      .toolbar {
+        if round?.card != nil {
+          ToolbarItem(placement: .primaryAction) {
+            Menu {
+              Button("Avbryt oppgaven", role: .destructive) { confirmSkip = true }
+            } label: { Label("Valg for oppgaven", systemImage: "ellipsis.circle") }
+            .disabled(busy)
+          }
+        }
+      }
+      .fullScreenCover(item: $celebration) { value in
+        RewardCelebrationView(celebration: value).presentationBackground(.clear)
+      }
+      .onChange(of: model.celebrationScope) { _, _ in celebration = nil }
+      .task(id: celebrationTrigger) {
+        guard canCelebrate, let round, round.card == nil, celebration == nil else { return }
+        let ids = Set(round.milestones.filter(\.earned).map(\.id))
+        let recorded = model.ownProgress?.achievements?.filter(\.earned).map(\.id) ?? []
+        guard !ids.isEmpty, ids.isSubset(of: recorded) else { return }
+        let notices = model.pendingRewardNotices().filter { notice in
+          if case .achievement(let achievement) = notice.content { return ids.contains(achievement.id) }
+          return false
+        }
+        if !notices.isEmpty {
+          celebration = RewardCelebration(scope: model.celebrationScope, notices: notices)
+        }
+      }
       .confirmationDialog("Avbryte oppgaven og bryte rekken?", isPresented: $confirmSkip) {
         Button("Avbryt oppgaven", role: .destructive) { Task { await update("skip") } }
       }
@@ -114,21 +101,100 @@ struct ExamPractice: View {
       }
   }
 
-  @ViewBuilder private func feedback(_ item: ExamRound.Feedback) -> some View {
-    if let result = item.result {
-      if let grade = result.grade { Text("Karakter \(grade)").font(.largeTitle.bold()) }
-      Text(result.improvement.isEmpty ? result.reason : result.improvement)
-      DisclosureGroup("Hele vurderingen") { AssessmentSummary(result: result, showsCriteria: true) }
-    } else {
-      Text(["processing","queued"].contains(item.status) ? "Svaret vurderes …" :
-           item.status == "skipped" ? "Oppgaven er avbrutt." : "Vurdering er utilgjengelig.")
-    }
-    DisclosureGroup("Oppgaven og svaret ditt") {
-      VStack(alignment: .leading, spacing: 10) {
-        Text(item.prompt).font(.subheadline)
-        Text(item.answer.isEmpty ? "Ingen tekst levert." : item.answer)
+  private var celebrationTrigger: [String] {
+    guard canCelebrate, celebration == nil, let round, round.card == nil else { return [] }
+    let earned = model.ownProgress?.achievements?.filter(\.earned).map(\.id) ?? []
+    return [model.celebrationScope] + round.milestones.filter(\.earned).map(\.id) + earned
+  }
+
+  private func writing(_ card: ExamRound.Card) -> some View {
+    TimelineView(.periodic(from: .now, by: 1)) { timeline in
+      let seconds = max(0, Int(ceil(card.deadline - timeline.date.timeIntervalSince1970)))
+      VStack(alignment: .leading, spacing: 18) {
+        HStack(alignment: .firstTextBaseline) {
+          Text(card.question.title ?? "Oppgave").font(.system(.title2, design: .rounded, weight: .bold))
+          Spacer(minLength: 12)
+          Label(String(format: "%d:%02d", seconds / 60, seconds % 60), systemImage: "timer")
+            .font(.headline.monospacedDigit()).fixedSize()
+            .accessibilityLabel("Tid igjen: \(seconds) sekunder")
+        }
+        QuestionPrompt(question: card.question)
+        QuestionMaterials(question: card.question)
+        AnswerEditor(text: Binding(get: { answer }, set: {
+          answer = String($0.prefix(6000))
+          UserDefaults.standard.set(["id": card.id, "base": card.answer, "answer": answer], forKey: draftKey)
+        }), blocked: { message = "Skriv svaret med egne ord." })
+          .frame(minHeight: 230).disabled(seconds == 0)
+          .accessibilityLabel("Ditt svar")
+        Button("Lever svar") { Task { await update("submit") } }.buttonStyle(PlayButton())
+          .disabled(busy || seconds == 0 || answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
       }
     }
+  }
+
+  @ViewBuilder private func practiceSummary(_ round: ExamRound) -> some View {
+    let last = round.history.first
+    if let last {
+      VStack(alignment: .leading, spacing: 10) {
+        Text(last.title).font(.subheadline).foregroundStyle(.secondary)
+        if let result = last.result {
+          if let grade = result.grade {
+            Text("Karakter \(grade)").font(.system(.largeTitle, design: .rounded, weight: .bold))
+          }
+          Text(result.improvement.isEmpty ? result.reason : result.improvement)
+          if result.grade != nil, round.available,
+             !round.history.contains(where: { ["processing", "queued"].contains($0.status) }),
+             let near = round.milestones.filter({ !$0.earned && $0.run == 2 }).max(by: { $0.threshold < $1.threshold }) {
+            Label("Én til med \(near.threshold) eller bedre på en annen oppgave gir \(near.stars) stjerner.",
+                  systemImage: "star").font(.subheadline).foregroundStyle(.secondary)
+          }
+        } else {
+          Text(statusText(last)).font(.headline)
+        }
+      }
+    } else {
+      Text(round.title).font(.system(.title2, design: .rounded, weight: .bold))
+      Text("Tre minutter per oppgave. Oppgaver du strever med kommer tilbake oftere.")
+        .foregroundStyle(.secondary)
+    }
+    if round.available {
+      Button(last == nil ? "Start øving" : "Neste oppgave") { Task { await update("start") } }
+        .buttonStyle(PlayButton()).disabled(busy)
+    } else {
+      Text("Ingen nye oppgaver akkurat nå.").foregroundStyle(.secondary)
+    }
+    if let last {
+      DisclosureGroup("Se gjennom svaret") { review(last) }.id(last.id)
+    }
+    Text("\(round.practiced) av \(round.total) oppgaver øvd").font(.footnote).foregroundStyle(.secondary)
+    if round.history.count > 1 {
+      DisclosureGroup("Tidligere svar") {
+        ForEach(round.history.dropFirst()) { item in
+          DisclosureGroup(item.title) { review(item) }.padding(.vertical, 6)
+        }
+      }
+    }
+  }
+
+  private func statusText(_ item: ExamRound.Feedback) -> String {
+    switch item.status {
+    case "processing", "queued": return "Svaret vurderes …"
+    case "skipped": return "Oppgaven er avbrutt."
+    default: return "Vurdering er utilgjengelig."
+    }
+  }
+
+  private func review(_ item: ExamRound.Feedback) -> some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Text(item.prompt)
+      Divider()
+      Text("Ditt svar").font(.headline)
+      Text(item.answer.isEmpty ? "Ingen tekst levert." : item.answer)
+      if let result = item.result {
+        if let grade = result.grade { Text("Karakter \(grade)").font(.headline) }
+        AssessmentSummary(result: result, showsCriteria: true)
+      } else { Text(statusText(item)).foregroundStyle(.secondary) }
+    }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 12)
   }
 
   private var draftKey: String { "exam-draft-\(model.session?.user_id ?? "")" }
