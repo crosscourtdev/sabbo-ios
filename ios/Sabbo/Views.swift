@@ -91,12 +91,14 @@ struct SabboRoot: View {
       List(selection: Binding<String?>(get: { model.selectedTab }, set: { if let value = $0 { model.selectedTab = value } })) {
         Label("I dag", systemImage: "house.fill").tag("today")
         Label("Fag", systemImage: "books.vertical").tag("subjects")
+        Label("Eksamen", systemImage: "timer").tag("exam")
         Label("Sammen", systemImage: "person.2.fill").tag("together")
         Label("Innstillinger", systemImage: "slider.horizontal.3").tag("settings")
       }.navigationTitle("Sabbo")
     } detail: {
       NavigationStack {
         switch model.selectedTab {
+        case "exam": ExamPractice().id(model.session?.user_id)
         case "subjects": SubjectsView()
         case "together": TogetherView()
         case "settings": SettingsView()
@@ -110,6 +112,7 @@ struct SabboRoot: View {
             Label("I dag", systemImage: "house.fill")
           }.tag("today")
           NavigationStack { SubjectsView() }.tabItem { Label("Fag", systemImage: "books.vertical") }.tag("subjects")
+          NavigationStack { ExamPractice().id(model.session?.user_id) }.tabItem { Label("Eksamen", systemImage: "timer") }.tag("exam")
           NavigationStack { TogetherView() }.tabItem { Label("Sammen", systemImage: "person.2.fill") }.tag("together")
           NavigationStack { SettingsView() }.tabItem {
             Label("Innstillinger", systemImage: "slider.horizontal.3")
