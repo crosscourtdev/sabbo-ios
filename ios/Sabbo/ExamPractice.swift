@@ -28,6 +28,7 @@ struct ExamPractice: View {
   let canCelebrate: Bool
   @State private var celebration: RewardCelebration?
   @EnvironmentObject var model: AppModel
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var round: ExamRound?
   @State private var answer = ""
   @State private var busy = false
@@ -134,36 +135,42 @@ struct ExamPractice: View {
 
   @ViewBuilder private func practiceSummary(_ round: ExamRound) -> some View {
     let last = round.history.first
+    let pending = last.map { ["processing", "queued"].contains($0.status) } ?? false
+    let failed = last.map { $0.status != "skipped" && $0.result == nil } == true && !pending
     if let last {
       VStack(alignment: .leading, spacing: 10) {
         Text(last.title).font(.subheadline).foregroundStyle(.secondary)
-        if let result = last.result {
+        if pending {
+          SabboReadingAnswer().frame(maxWidth: .infinity)
+            .transition(.asymmetric(insertion: .opacity, removal: .offset(y: -8).combined(with: .opacity)))
+        } else if let result = last.result {
           if let grade = result.grade {
             Text("Karakter \(grade)").font(.system(.largeTitle, design: .rounded, weight: .bold))
           }
           Text(result.improvement.isEmpty ? result.reason : result.improvement)
-          if result.grade != nil, round.available,
-             !round.history.contains(where: { ["processing", "queued"].contains($0.status) }),
-             let near = round.milestones.filter({ !$0.earned && $0.run == 2 }).max(by: { $0.threshold < $1.threshold }) {
-            Label("Én til med \(near.threshold) eller bedre på en annen oppgave gir \(near.stars) stjerner.",
-                  systemImage: "star").font(.subheadline).foregroundStyle(.secondary)
-          }
+          if result.grade != nil { streakProgress(round) }
+        } else if failed {
+          Button("Prøv vurderingen igjen") { Task { await update("retry") } }
+            .buttonStyle(PlayButton()).disabled(busy)
         } else {
           Text(statusText(last)).font(.headline)
         }
-      }
+      }.animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: pending)
     } else {
       Text(round.title).font(.system(.title2, design: .rounded, weight: .bold))
       Text("Tre minutter per oppgave. Oppgaver du strever med kommer tilbake oftere.")
         .foregroundStyle(.secondary)
+      streakProgress(round)
     }
-    if round.available {
-      Button(last == nil ? "Start øving" : "Neste oppgave") { Task { await update("start") } }
-        .buttonStyle(PlayButton()).disabled(busy)
-    } else {
-      Text("Ingen nye oppgaver akkurat nå.").foregroundStyle(.secondary)
+    if !pending && !failed {
+      if round.available {
+        Button(last == nil ? "Start øving" : "Neste oppgave") { Task { await update("start") } }
+          .buttonStyle(PlayButton()).disabled(busy)
+      } else {
+        Text("Ingen nye oppgaver akkurat nå.").foregroundStyle(.secondary)
+      }
     }
-    if let last {
+    if let last, !pending {
       DisclosureGroup("Se gjennom svaret") { review(last) }.id(last.id)
     }
     Text("\(round.practiced) av \(round.total) oppgaver øvd").font(.footnote).foregroundStyle(.secondary)
@@ -172,6 +179,27 @@ struct ExamPractice: View {
         ForEach(round.history.dropFirst()) { item in
           DisclosureGroup(item.title) { review(item) }.padding(.vertical, 6)
         }
+      }
+    }
+  }
+
+  @ViewBuilder private func streakProgress(_ round: ExamRound) -> some View {
+    let target = round.milestones.filter { !$0.earned }.sorted {
+      if $0.run != $1.run { return $0.run > $1.run }
+      return $0.threshold < $1.threshold
+    }.first
+    if let target {
+      VStack(alignment: .leading, spacing: 7) {
+        HStack(spacing: 5) {
+          ForEach(0..<3) { step in
+            Capsule().fill(step < target.run ? SabboStyle.forest : Color.secondary.opacity(0.22))
+              .frame(width: 28, height: 5)
+          }
+        }.accessibilityHidden(true)
+        Text(target.run == 2
+             ? "Én til med \(target.threshold) eller bedre gir \(target.stars) stjerner."
+             : "\(target.run) av 3 oppgaver på rad med \(target.threshold) eller bedre")
+          .font(.subheadline).foregroundStyle(.secondary)
       }
     }
   }
@@ -242,5 +270,42 @@ struct ExamPractice: View {
     } catch {
       if !Task.isCancelled { message = "Kunne ikke synkronisere eksamensøkten." }
     }
+  }
+}
+
+private struct SabboReadingAnswer: View {
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @State private var began = Date()
+
+  var body: some View {
+    TimelineView(.animation(minimumInterval: 1.0 / 24, paused: reduceMotion)) { timeline in
+      let seconds = reduceMotion ? 0 : timeline.date.timeIntervalSince(began)
+      let scan = CGFloat(sin(seconds * 2.4))
+      let mark = CGFloat(max(0, sin(seconds * 2.4 - 0.9)))
+      ZStack {
+        PortraitMark(size: 130)
+          .overlay {
+            // Move the eye strip within the portrait as Sabbo follows the line.
+            Image("Portrait").resizable().frame(width: 130, height: 130)
+              .offset(x: 1.7 * scan, y: 1.2)
+              .mask { Rectangle().frame(width: 31, height: 16).offset(x: -23, y: 3) }
+          }
+          .rotationEffect(.degrees(4 + Double(scan) * 1.8))
+          .offset(y: -12)
+        ZStack(alignment: .leading) {
+          RoundedRectangle(cornerRadius: 5).fill(Color(.systemBackground))
+            .overlay { RoundedRectangle(cornerRadius: 5).strokeBorder(.primary.opacity(0.6), lineWidth: 1.5) }
+          VStack(alignment: .leading, spacing: 5) {
+            ForEach([43, 34, 39], id: \.self) { width in
+              Capsule().fill(.secondary.opacity(0.45)).frame(width: CGFloat(width), height: 2)
+            }
+          }.padding(.leading, 10)
+          Capsule().fill(SabboStyle.forest).frame(width: 2 + 11 * mark, height: 2)
+            .offset(x: 48, y: 9)
+          Image(systemName: "pencil").font(.system(size: 22, weight: .semibold))
+            .foregroundStyle(SabboStyle.forest).offset(x: 47 + 11 * mark, y: -1)
+        }.frame(width: 80, height: 44).rotationEffect(.degrees(-8)).offset(x: 7, y: 49)
+      }.frame(width: 170, height: 170)
+    }.accessibilityElement(children: .ignore).accessibilityLabel("Svaret er levert og vurderes")
   }
 }
