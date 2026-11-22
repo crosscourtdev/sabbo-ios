@@ -141,7 +141,7 @@ struct ExamPractice: View {
       VStack(alignment: .leading, spacing: 10) {
         Text(last.title).font(.subheadline).foregroundStyle(.secondary)
         if pending {
-          SabboReadingAnswer().frame(maxWidth: .infinity)
+          SabboReadingAnswer().frame(width: 220, height: 196).frame(maxWidth: .infinity)
             .transition(.asymmetric(insertion: .opacity, removal: .offset(y: -8).combined(with: .opacity)))
         } else if let result = last.result {
           if let grade = result.grade {
@@ -273,39 +273,103 @@ struct ExamPractice: View {
   }
 }
 
-private struct SabboReadingAnswer: View {
+private struct SabboReadingAnswer: UIViewRepresentable {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  @State private var began = Date()
 
-  var body: some View {
-    TimelineView(.animation(minimumInterval: 1.0 / 24, paused: reduceMotion)) { timeline in
-      let seconds = reduceMotion ? 0 : timeline.date.timeIntervalSince(began)
-      let scan = CGFloat(sin(seconds * 2.4))
-      let mark = CGFloat(max(0, sin(seconds * 2.4 - 0.9)))
-      ZStack {
-        PortraitMark(size: 130)
-          .overlay {
-            // Move the eye strip within the portrait as Sabbo follows the line.
-            Image("Portrait").resizable().frame(width: 130, height: 130)
-              .offset(x: 1.7 * scan, y: 1.2)
-              .mask { Rectangle().frame(width: 31, height: 16).offset(x: -23, y: 3) }
-          }
-          .rotationEffect(.degrees(4 + Double(scan) * 1.8))
-          .offset(y: -12)
-        ZStack(alignment: .leading) {
-          RoundedRectangle(cornerRadius: 5).fill(Color(.systemBackground))
-            .overlay { RoundedRectangle(cornerRadius: 5).strokeBorder(.primary.opacity(0.6), lineWidth: 1.5) }
-          VStack(alignment: .leading, spacing: 5) {
-            ForEach([43, 34, 39], id: \.self) { width in
-              Capsule().fill(.secondary.opacity(0.45)).frame(width: CGFloat(width), height: 2)
-            }
-          }.padding(.leading, 10)
-          Capsule().fill(SabboStyle.forest).frame(width: 2 + 11 * mark, height: 2)
-            .offset(x: 48, y: 9)
-          Image(systemName: "pencil").font(.system(size: 22, weight: .semibold))
-            .foregroundStyle(SabboStyle.forest).offset(x: 47 + 11 * mark, y: -1)
-        }.frame(width: 80, height: 44).rotationEffect(.degrees(-8)).offset(x: 7, y: 49)
-      }.frame(width: 170, height: 170)
-    }.accessibilityElement(children: .ignore).accessibilityLabel("Svaret er levert og vurderes")
+  func makeUIView(context: Context) -> ReadingAnswerImageView { ReadingAnswerImageView() }
+  func updateUIView(_ view: ReadingAnswerImageView, context: Context) {
+    view.reduceMotion = reduceMotion
+  }
+}
+
+final class ReadingAnswerImageView: UIImageView {
+  var reduceMotion = false { didSet { updatePlayback() } }
+
+  override func didMoveToWindow() {
+    super.didMoveToWindow()
+    contentMode = .scaleAspectFit
+    isAccessibilityElement = true
+    accessibilityLabel = "Svaret er levert og vurderes"
+    updatePlayback()
+  }
+
+  private func updatePlayback() {
+    guard window != nil, !reduceMotion else {
+      stopAnimating()
+      animationImages = nil
+      image = Self.still
+      return
+    }
+    if animationImages == nil {
+      image = Self.still
+      animationImages = Self.frames
+      animationDuration = 2.8
+      animationRepeatCount = 0
+    }
+    if !isAnimating { startAnimating() }
+  }
+
+  private static let portrait = UIImage(named: "Portrait")
+  private static let still = frame(0.43)
+  private static let frames = (0..<42).map { frame(CGFloat($0) / 42) }
+
+  // Sabbo follows the pencil across three lines, then lifts his head as the page turns.
+  private static func frame(_ phase: CGFloat) -> UIImage {
+    let format = UIGraphicsImageRendererFormat()
+    format.scale = 1.5
+    let renderer = UIGraphicsImageRenderer(size: CGSize(width: 220, height: 196), format: format)
+    return renderer.image { output in
+      let ctx = output.cgContext
+      let writing = min(phase / 0.78, 1) * 3
+      let line = min(2, Int(writing))
+      let amount = writing - CGFloat(line)
+      let lift = phase < 0.78 ? 0 : sin((phase - 0.78) / 0.22 * .pi)
+      let scan = sin(2 * .pi * writing - .pi / 2)
+      let ink = UIColor(red: 0.08, green: 0.24, blue: 0.19, alpha: 1)
+      ctx.saveGState()
+      ctx.translateBy(x: 106 + 7 * scan, y: 75 + 5 * cos(2 * .pi * writing) - 10 * lift)
+      ctx.rotate(by: (6 * scan - 6 * lift) * .pi / 180)
+      let face = CGRect(x: -65, y: -65, width: 130, height: 130)
+      UIBezierPath(roundedRect: face, cornerRadius: 34).addClip()
+      portrait?.draw(in: face)
+      ctx.restoreGState()
+
+      ctx.translateBy(x: 48, y: 116 - 7 * lift)
+      ctx.rotate(by: (-0.07 - 0.15 * lift))
+      let paper = UIBezierPath(roundedRect: CGRect(x: 0, y: 0, width: 127, height: 68), cornerRadius: 7)
+      UIColor(white: 0.99, alpha: 1).setFill()
+      paper.fill()
+      ink.setStroke()
+      paper.lineWidth = 2
+      paper.stroke()
+      let widths: [CGFloat] = [84, 96, 69]
+      for i in 0...line {
+        let length = widths[i] * (i == line ? amount : 1)
+        let path = UIBezierPath()
+        let y = CGFloat(16 + 17 * i)
+        path.move(to: CGPoint(x: 13, y: y))
+        for x in stride(from: CGFloat(0), through: length, by: 1) {
+          path.addLine(to: CGPoint(x: 13 + x, y: y + 2 * sin(x * 0.55)))
+        }
+        path.lineWidth = 2.5
+        path.lineCapStyle = .round
+        path.stroke()
+      }
+      let x = widths[line] * amount
+      ctx.translateBy(x: 13 + x + 10 * lift, y: CGFloat(16 + 17 * line) + 2 * sin(x * 0.55) - 15 * lift)
+      ctx.rotate(by: 0.55 + 0.12 * scan)
+      let barrel = UIBezierPath(roundedRect: CGRect(x: -5, y: -46, width: 10, height: 39), cornerRadius: 3)
+      UIColor.systemOrange.setFill()
+      barrel.fill()
+      barrel.lineWidth = 1.5
+      barrel.stroke()
+      let tip = UIBezierPath()
+      tip.move(to: .zero)
+      tip.addLine(to: CGPoint(x: -5, y: -8))
+      tip.addLine(to: CGPoint(x: 5, y: -8))
+      tip.close()
+      ink.setFill()
+      tip.fill()
+    }
   }
 }
