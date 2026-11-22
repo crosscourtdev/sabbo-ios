@@ -139,28 +139,46 @@ struct ExamPractice: View {
     let pending = last.map { ["processing", "queued"].contains($0.status) } ?? false
     let failed = last.map { $0.status != "skipped" && $0.result == nil } == true && !pending
     if let last {
-      VStack(alignment: .leading, spacing: 10) {
-        Text(last.title).font(.subheadline).foregroundStyle(.secondary)
-        if pending {
-          PracticeWaitingScene(version: last.dance_version ?? 5, reduceMotion: reduceMotion)
-            .frame(width: 220, height: 220).frame(maxWidth: .infinity)
+      VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 4) {
+          Text("PoMe").font(.subheadline.weight(.semibold)).foregroundStyle(Color.accentColor)
+          Text(last.title).font(.system(.title2, design: .rounded, weight: .bold))
+        }
 
-        } else if let result = last.result {
-          if let grade = result.grade {
-            Text("Karakter \(grade)").font(.system(.largeTitle, design: .rounded, weight: .bold))
+        VStack(alignment: .leading, spacing: 0) {
+          if pending {
+            PracticeWaitingScene(version: last.dance_version ?? 5, reduceMotion: reduceMotion)
+              .frame(width: 124, height: 122)
+              .frame(maxWidth: .infinity, alignment: .bottom)
+          } else if let grade = last.result?.grade {
+            VStack(alignment: .leading, spacing: 2) {
+              Text("Karakter").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+              Text(String(grade)).font(.system(.largeTitle, design: .rounded, weight: .bold))
+            }
+            .accessibilityElement(children: .combine)
+            .frame(minHeight: 122)
           }
+          Rectangle().fill(Color.accentColor.opacity(0.4)).frame(height: 1)
+        }
+
+        if let result = last.result {
           Text(result.improvement.isEmpty ? result.reason : result.improvement)
           if result.grade != nil { streakProgress(round) }
         } else if failed {
           Button("Prøv vurderingen igjen") { Task { await update("retry") } }
             .buttonStyle(PlayButton()).disabled(busy)
-        } else {
+        } else if !pending {
           Text(statusText(last)).font(.headline)
         }
-      }.animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: pending)
+        DisclosureGroup("Se gjennom svaret") { review(last, waiting: pending) }.id(last.id)
+      }
+      .padding(18)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22))
+      .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: pending)
     } else {
       Text(round.title).font(.system(.title2, design: .rounded, weight: .bold))
-      Text("Tre minutter per oppgave. Oppgaver du strever med kommer tilbake oftere.")
+      Text("Fem minutter per oppgave. Oppgaver du strever med kommer tilbake oftere.")
         .foregroundStyle(.secondary)
       streakProgress(round)
     }
@@ -171,9 +189,6 @@ struct ExamPractice: View {
       } else {
         Text("Ingen nye oppgaver akkurat nå.").foregroundStyle(.secondary)
       }
-    }
-    if let last, !pending {
-      DisclosureGroup("Se gjennom svaret") { review(last) }.id(last.id)
     }
     Text("\(round.practiced) av \(round.total) oppgaver øvd").font(.footnote).foregroundStyle(.secondary)
     if round.history.count > 1 {
@@ -214,7 +229,7 @@ struct ExamPractice: View {
     }
   }
 
-  private func review(_ item: ExamRound.Feedback) -> some View {
+  private func review(_ item: ExamRound.Feedback, waiting: Bool = false) -> some View {
     VStack(alignment: .leading, spacing: 12) {
       Text(item.prompt)
       Divider()
@@ -223,7 +238,7 @@ struct ExamPractice: View {
       if let result = item.result {
         if let grade = result.grade { Text("Karakter \(grade)").font(.headline) }
         AssessmentSummary(result: result, showsCriteria: true)
-      } else { Text(statusText(item)).foregroundStyle(.secondary) }
+      } else if !waiting { Text(statusText(item)).foregroundStyle(.secondary) }
     }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 12)
   }
 
