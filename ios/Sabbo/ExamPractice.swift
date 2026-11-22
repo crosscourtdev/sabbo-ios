@@ -142,8 +142,9 @@ struct ExamPractice: View {
       VStack(alignment: .leading, spacing: 10) {
         Text(last.title).font(.subheadline).foregroundStyle(.secondary)
         if pending {
-          PracticeDance(version: last.dance_version ?? 5).frame(width: 220, height: 220).frame(maxWidth: .infinity)
-            .transition(.asymmetric(insertion: .opacity, removal: .offset(y: -8).combined(with: .opacity)))
+          PracticeWaitingScene(version: last.dance_version ?? 5, reduceMotion: reduceMotion)
+            .frame(width: 220, height: 220).frame(maxWidth: .infinity)
+
         } else if let result = last.result {
           if let grade = result.grade {
             Text("Karakter \(grade)").font(.system(.largeTitle, design: .rounded, weight: .bold))
@@ -274,7 +275,17 @@ struct ExamPractice: View {
   }
 }
 
-struct PracticeDance: UIViewRepresentable {
+struct PracticeWaitingScene: View {
+  let version: Int
+  let reduceMotion: Bool
+
+  var body: some View {
+    PracticeDance(version: version)
+      .transition(reduceMotion ? .identity : .asymmetric(insertion: .opacity, removal: .offset(y: -8).combined(with: .opacity)))
+  }
+}
+
+private struct PracticeDance: UIViewRepresentable {
   let version: Int
 
   func makeUIView(context: Context) -> PracticeDanceImageView { PracticeDanceImageView() }

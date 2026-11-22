@@ -15,7 +15,7 @@ final class EffectsTests: XCTestCase {
     let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 220, height: 220))
     var firstFrames: [Data] = []
     for version in [5, 6] {
-      let host = UIHostingController(rootView: PracticeDance(version: version).environment(\.accessibilityReduceMotion, true))
+      let host = UIHostingController(rootView: PracticeWaitingScene(version: version, reduceMotion: true))
       window.rootViewController = host
       window.isHidden = false
       host.view.layoutIfNeeded()
