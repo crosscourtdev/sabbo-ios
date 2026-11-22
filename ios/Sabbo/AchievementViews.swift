@@ -219,6 +219,13 @@ struct RewardCollection: View {
               }
             }
           }
+          if viewingPeer {
+            NavigationLink {
+              LearnerPracticeHistory()
+            } label: {
+              Label("Øvingssvar", systemImage: "list.clipboard")
+            }
+          }
           Label(viewingPeer ? "\(peer?.streak.name ?? "") sine achievements" : "Achievements", systemImage: "trophy.fill")
             .font(.system(.title2, design: .rounded, weight: .bold))
           ForEach(progress?.achievements ?? []) { item in

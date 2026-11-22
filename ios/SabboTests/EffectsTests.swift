@@ -1,24 +1,34 @@
+import SwiftUI
 import UIKit
 import XCTest
 @testable import Sabbo
 
 final class EffectsTests: XCTestCase {
-  @MainActor func testReadingScenePlaysDistinctFramesAndRespectsReduceMotion() throws {
-    let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 220, height: 196))
-    let scene = ReadingAnswerImageView(frame: window.bounds)
-    window.addSubview(scene)
-    let frames = try XCTUnwrap(scene.animationImages)
-    XCTAssertTrue(scene.isAnimating)
-    XCTAssertGreaterThan(frames.count, 12)
-    XCTAssertNotEqual(frames[0].pngData(), frames[frames.count / 2].pngData())
-    scene.reduceMotion = true
-    XCTAssertFalse(scene.isAnimating)
-    XCTAssertNil(scene.animationImages)
-    XCTAssertNotNil(scene.image)
-    scene.reduceMotion = false
-    XCTAssertTrue(scene.isAnimating)
-    scene.removeFromSuperview()
-    XCTAssertFalse(scene.isAnimating)
+  @MainActor func testPracticeLoopsPlayWithReduceMotionEnabled() throws {
+    func imageView(in root: UIView) -> PracticeDanceImageView? {
+      if let image = root as? PracticeDanceImageView { return image }
+      for child in root.subviews {
+        if let found = imageView(in: child) { return found }
+      }
+      return nil
+    }
+    let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 220, height: 220))
+    var firstFrames: [Data] = []
+    for version in [5, 6] {
+      let host = UIHostingController(rootView: PracticeDance(version: version).environment(\.accessibilityReduceMotion, true))
+      window.rootViewController = host
+      window.isHidden = false
+      host.view.layoutIfNeeded()
+      let scene = try XCTUnwrap(imageView(in: host.view))
+      let frames = try XCTUnwrap(scene.animationImages)
+      XCTAssertEqual(frames.count, 8)
+      XCTAssertTrue(scene.isAnimating)
+      XCTAssertNotEqual(frames[0].pngData(), frames[2].pngData())
+      firstFrames.append(try XCTUnwrap(frames[0].pngData()))
+      window.rootViewController = nil
+      XCTAssertFalse(scene.isAnimating)
+    }
+    XCTAssertNotEqual(firstFrames[0], firstFrames[1])
   }
 
   func testEverySoundIsShortAudibleUnclippedAndEndsSilently() {

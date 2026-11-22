@@ -9,6 +9,7 @@ private struct ExamRound: Decodable {
   }
   struct Feedback: Decodable, Identifiable {
     let id, title, prompt, answer, status: String
+    let dance_version: Int?
     let result: GradeResult?
   }
   struct Milestone: Decodable {
@@ -141,7 +142,7 @@ struct ExamPractice: View {
       VStack(alignment: .leading, spacing: 10) {
         Text(last.title).font(.subheadline).foregroundStyle(.secondary)
         if pending {
-          SabboReadingAnswer().frame(width: 220, height: 196).frame(maxWidth: .infinity)
+          PracticeDance(version: last.dance_version ?? 5).frame(width: 220, height: 220).frame(maxWidth: .infinity)
             .transition(.asymmetric(insertion: .opacity, removal: .offset(y: -8).combined(with: .opacity)))
         } else if let result = last.result {
           if let grade = result.grade {
@@ -273,103 +274,45 @@ struct ExamPractice: View {
   }
 }
 
-private struct SabboReadingAnswer: UIViewRepresentable {
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+struct PracticeDance: UIViewRepresentable {
+  let version: Int
 
-  func makeUIView(context: Context) -> ReadingAnswerImageView { ReadingAnswerImageView() }
-  func updateUIView(_ view: ReadingAnswerImageView, context: Context) {
-    view.reduceMotion = reduceMotion
-  }
+  func makeUIView(context: Context) -> PracticeDanceImageView { PracticeDanceImageView() }
+  func updateUIView(_ view: PracticeDanceImageView, context: Context) { view.show(version) }
 }
 
-final class ReadingAnswerImageView: UIImageView {
-  var reduceMotion = false { didSet { updatePlayback() } }
+final class PracticeDanceImageView: UIImageView {
+  private var version: Int?
+  private static let clips = [5: frames(named: "PracticeDance5"), 6: frames(named: "PracticeDance6")]
 
-  override func didMoveToWindow() {
-    super.didMoveToWindow()
+  private static func frames(named name: String) -> [UIImage] {
+    guard let sheet = UIImage(named: name)?.cgImage else { return [] }
+    let width = sheet.width / 4
+    let height = sheet.height / 2
+    return (0..<8).compactMap { index in
+      let rect = CGRect(x: index % 4 * width, y: index / 4 * height, width: width, height: height)
+      return sheet.cropping(to: rect).map { UIImage(cgImage: $0) }
+    }
+  }
+
+  func show(_ version: Int) {
+    guard version != self.version else { return }
+    self.version = version
+    stopAnimating()
+    let frames = Self.clips[version] ?? Self.clips[5] ?? []
     contentMode = .scaleAspectFit
     isAccessibilityElement = true
     accessibilityLabel = "Svaret er levert og vurderes"
-    updatePlayback()
+    image = frames.first
+    animationImages = frames
+    animationDuration = 0.8
+    animationRepeatCount = 0
+    if window != nil { startAnimating() }
   }
 
-  private func updatePlayback() {
-    guard window != nil, !reduceMotion else {
-      stopAnimating()
-      animationImages = nil
-      image = Self.still
-      return
-    }
-    if animationImages == nil {
-      image = Self.still
-      animationImages = Self.frames
-      animationDuration = 2.8
-      animationRepeatCount = 0
-    }
-    if !isAnimating { startAnimating() }
-  }
-
-  private static let portrait = UIImage(named: "Portrait")
-  private static let still = frame(0.43)
-  private static let frames = (0..<42).map { frame(CGFloat($0) / 42) }
-
-  // Sabbo follows the pencil across three lines, then lifts his head as the page turns.
-  private static func frame(_ phase: CGFloat) -> UIImage {
-    let format = UIGraphicsImageRendererFormat()
-    format.scale = 1.5
-    let renderer = UIGraphicsImageRenderer(size: CGSize(width: 220, height: 196), format: format)
-    return renderer.image { output in
-      let ctx = output.cgContext
-      let writing = min(phase / 0.78, 1) * 3
-      let line = min(2, Int(writing))
-      let amount = writing - CGFloat(line)
-      let lift = phase < 0.78 ? 0 : sin((phase - 0.78) / 0.22 * .pi)
-      let scan = sin(2 * .pi * writing - .pi / 2)
-      let ink = UIColor(red: 0.08, green: 0.24, blue: 0.19, alpha: 1)
-      ctx.saveGState()
-      ctx.translateBy(x: 106 + 7 * scan, y: 75 + 5 * cos(2 * .pi * writing) - 10 * lift)
-      ctx.rotate(by: (6 * scan - 6 * lift) * .pi / 180)
-      let face = CGRect(x: -65, y: -65, width: 130, height: 130)
-      UIBezierPath(roundedRect: face, cornerRadius: 34).addClip()
-      portrait?.draw(in: face)
-      ctx.restoreGState()
-
-      ctx.translateBy(x: 48, y: 116 - 7 * lift)
-      ctx.rotate(by: (-0.07 - 0.15 * lift))
-      let paper = UIBezierPath(roundedRect: CGRect(x: 0, y: 0, width: 127, height: 68), cornerRadius: 7)
-      UIColor(white: 0.99, alpha: 1).setFill()
-      paper.fill()
-      ink.setStroke()
-      paper.lineWidth = 2
-      paper.stroke()
-      let widths: [CGFloat] = [84, 96, 69]
-      for i in 0...line {
-        let length = widths[i] * (i == line ? amount : 1)
-        let path = UIBezierPath()
-        let y = CGFloat(16 + 17 * i)
-        path.move(to: CGPoint(x: 13, y: y))
-        for x in stride(from: CGFloat(0), through: length, by: 1) {
-          path.addLine(to: CGPoint(x: 13 + x, y: y + 2 * sin(x * 0.55)))
-        }
-        path.lineWidth = 2.5
-        path.lineCapStyle = .round
-        path.stroke()
-      }
-      let x = widths[line] * amount
-      ctx.translateBy(x: 13 + x + 10 * lift, y: CGFloat(16 + 17 * line) + 2 * sin(x * 0.55) - 15 * lift)
-      ctx.rotate(by: 0.55 + 0.12 * scan)
-      let barrel = UIBezierPath(roundedRect: CGRect(x: -5, y: -46, width: 10, height: 39), cornerRadius: 3)
-      UIColor.systemOrange.setFill()
-      barrel.fill()
-      barrel.lineWidth = 1.5
-      barrel.stroke()
-      let tip = UIBezierPath()
-      tip.move(to: .zero)
-      tip.addLine(to: CGPoint(x: -5, y: -8))
-      tip.addLine(to: CGPoint(x: 5, y: -8))
-      tip.close()
-      ink.setFill()
-      tip.fill()
-    }
+  override func didMoveToWindow() {
+    super.didMoveToWindow()
+    if window == nil { stopAnimating() }
+    else if animationImages != nil { startAnimating() }
   }
 }
