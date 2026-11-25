@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFAudio
 
 private struct ExamRound: Decodable {
   struct Card: Decodable {
@@ -18,8 +19,9 @@ private struct ExamRound: Decodable {
     let earned: Bool
   }
   let title: String
+  let oral: Bool
   let card: Card?
-  let history: [Feedback]
+  let history, previous_history: [Feedback]
   let milestones: [Milestone]
   let available, conflict: Bool
   let practiced, total: Int
@@ -30,6 +32,9 @@ struct ExamPractice: View {
   @State private var celebration: RewardCelebration?
   @EnvironmentObject var model: AppModel
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @Environment(\.scenePhase) private var scenePhase
+  @StateObject private var speech = OralPractice()
+  @State private var preparing = false
   @State private var round: ExamRound?
   @State private var answer = ""
   @State private var busy = false
@@ -41,11 +46,15 @@ struct ExamPractice: View {
       VStack(alignment: .leading, spacing: 20) {
         if let round {
           if let card = round.card {
-            writing(card)
+            if round.oral && !OralPractice.isPhone {
+              Text("Åpne Øving på iPhone for å svare muntlig.")
+            } else { writing(card, oral: round.oral) }
           } else {
             practiceSummary(round)
           }
         } else if message == nil { ProgressView() }
+        if preparing { ProgressView("Gjør mikrofonen klar") }
+        if let notice = speech.notice { Text(notice).foregroundStyle(.secondary) }
         if let message {
           Text(message).foregroundStyle(.secondary)
           Button("Oppdater") { Task { await update() } }.disabled(busy)
@@ -55,7 +64,7 @@ struct ExamPractice: View {
       .background(Color(.systemGroupedBackground))
       .navigationTitle("Øving")
       .toolbar {
-        if round?.card != nil {
+        if round?.card != nil && (round?.oral != true || OralPractice.isPhone) {
           ToolbarItem(placement: .primaryAction) {
             Menu {
               Button("Avbryt oppgaven", role: .destructive) { confirmSkip = true }
@@ -84,6 +93,16 @@ struct ExamPractice: View {
       .confirmationDialog("Avbryte oppgaven og bryte rekken?", isPresented: $confirmSkip) {
         Button("Avbryt oppgaven", role: .destructive) { Task { await update("skip") } }
       }
+      .onDisappear { speech.stop() }
+      .onChange(of: scenePhase) { _, phase in
+        if phase == .background { speech.stop() }
+        if phase == .active && round?.card == nil { Task { await update() } }
+      }
+      .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)) { note in
+        if note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt == AVAudioSession.InterruptionType.began.rawValue {
+          speech.stop()
+        }
+      }
       .task {
         await update()
         var ticks = 0
@@ -91,7 +110,9 @@ struct ExamPractice: View {
           do { try await Task.sleep(for: .milliseconds(500)) } catch { return }
           ticks += 1
           if let card = round?.card {
-            if Date().timeIntervalSince1970 >= card.deadline {
+            if round?.oral == true {
+              if Date().timeIntervalSince1970 >= card.deadline { speech.stop() }
+            } else if Date().timeIntervalSince1970 >= card.deadline {
               await update("submit")
             } else if card.answer != answer {
               await update("draft")
@@ -109,7 +130,7 @@ struct ExamPractice: View {
     return [model.celebrationScope] + round.milestones.filter(\.earned).map(\.id) + earned
   }
 
-  private func writing(_ card: ExamRound.Card) -> some View {
+  private func writing(_ card: ExamRound.Card, oral: Bool) -> some View {
     TimelineView(.periodic(from: .now, by: 1)) { timeline in
       let seconds = max(0, Int(ceil(card.deadline - timeline.date.timeIntervalSince1970)))
       VStack(alignment: .leading, spacing: 18) {
@@ -122,14 +143,57 @@ struct ExamPractice: View {
         }
         QuestionPrompt(question: card.question)
         QuestionMaterials(question: card.question)
-        AnswerEditor(text: Binding(get: { answer }, set: {
-          answer = String($0.prefix(6000))
-          UserDefaults.standard.set(["id": card.id, "base": card.answer, "answer": answer], forKey: draftKey)
-        }), blocked: { message = "Skriv svaret med egne ord." })
-          .frame(minHeight: 230).disabled(seconds == 0)
-          .accessibilityLabel("Ditt svar")
-        Button("Lever svar") { Task { await update("submit") } }.buttonStyle(PlayButton())
-          .disabled(busy || seconds == 0 || answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        if oral {
+          oralAnswer(card, seconds: seconds)
+        } else {
+          AnswerEditor(text: Binding(get: { answer }, set: {
+            answer = String($0.prefix(6000))
+            UserDefaults.standard.set(["id": card.id, "base": card.answer, "answer": answer], forKey: draftKey)
+          }), blocked: { message = "Skriv svaret med egne ord." })
+            .frame(minHeight: 230).disabled(seconds == 0)
+            .accessibilityLabel("Ditt svar")
+          Button("Lever svar") { Task { await update("submit") } }.buttonStyle(PlayButton())
+            .disabled(busy || seconds == 0 || answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+      }
+    }
+  }
+
+  @ViewBuilder private func oralAnswer(_ card: ExamRound.Card, seconds: Int) -> some View {
+    switch speech.phase {
+    case .recording:
+      Button { speech.stop() } label: { Label("Stopp", systemImage: "stop.circle.fill") }
+        .buttonStyle(PlayButton())
+    case .transcribing:
+      ProgressView("Gjør om tale til tekst")
+    case .idle:
+      if !speech.takes.isEmpty {
+        if speech.takes.count > 1 {
+          Picker("Velg opptak", selection: $speech.selected) {
+            ForEach(speech.takes.indices, id: \.self) { i in Text("Opptak \(i + 1)").tag(i) }
+          }
+        }
+        Text(speech.takes[speech.selected])
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .accessibilityLabel("Transkripsjon. \(speech.takes[speech.selected])")
+        Button("Lever svar") { Task { await update("submit") } }
+          .buttonStyle(PlayButton()).disabled(busy)
+      }
+      if seconds > 0 {
+        Button {
+          Task {
+            guard !preparing else { return }
+            preparing = true
+            defer { preparing = false }
+            guard await speech.prepare(), round?.card?.id == card.id, scenePhase == .active,
+                  model.selectedTab == "exam" else { return }
+            speech.record(until: Date(timeIntervalSince1970: card.deadline))
+          }
+        } label: { Label(speech.takes.isEmpty ? "Ta opp svar" : "Prøv igjen", systemImage: "mic.fill") }
+          .disabled(busy || preparing)
+      } else if speech.takes.isEmpty {
+        Text("Tiden er ute. Ingen opptak å levere.").foregroundStyle(.secondary)
+        Button("Avslutt oppgaven") { confirmSkip = true }
       }
     }
   }
@@ -139,26 +203,28 @@ struct ExamPractice: View {
     let pending = last.map { ["processing", "queued"].contains($0.status) } ?? false
     let failed = last.map { $0.status != "skipped" && $0.result == nil } == true && !pending
     if let last {
+      if pending {
+        VStack(spacing: 8) {
+          PracticeWaitingScene(version: last.dance_version ?? 5, reduceMotion: reduceMotion)
+            .frame(width: 124, height: 122).accessibilityHidden(true)
+          Text("Sjekker svar").font(.headline)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+      }
       VStack(alignment: .leading, spacing: 12) {
         VStack(alignment: .leading, spacing: 4) {
-          Text("PoMe").font(.subheadline.weight(.semibold)).foregroundStyle(Color.accentColor)
+          Text(round.oral ? "Religion" : "PoMe").font(.subheadline.weight(.semibold)).foregroundStyle(Color.accentColor)
           Text(last.title).font(.system(.title2, design: .rounded, weight: .bold))
         }
 
-        VStack(alignment: .leading, spacing: 0) {
-          if pending {
-            PracticeWaitingScene(version: last.dance_version ?? 5, reduceMotion: reduceMotion)
-              .frame(width: 124, height: 122)
-              .frame(maxWidth: .infinity, alignment: .bottom)
-          } else if let grade = last.result?.grade {
-            VStack(alignment: .leading, spacing: 2) {
-              Text("Karakter").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
-              Text(String(grade)).font(.system(.largeTitle, design: .rounded, weight: .bold))
-            }
-            .accessibilityElement(children: .combine)
-            .frame(minHeight: 122)
+        if let grade = last.result?.grade {
+          VStack(alignment: .leading, spacing: 2) {
+            Text("Karakter").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+            Text(String(grade)).font(.system(.largeTitle, design: .rounded, weight: .bold))
           }
-          Rectangle().fill(Color.accentColor.opacity(0.4)).frame(height: 1)
+          .accessibilityElement(children: .combine)
+          Divider()
         }
 
         if let result = last.result {
@@ -183,17 +249,28 @@ struct ExamPractice: View {
       streakProgress(round)
     }
     if !pending && !failed {
-      if round.available {
-        Button(last == nil ? "Start øving" : "Neste oppgave") { Task { await update("start") } }
-          .buttonStyle(PlayButton()).disabled(busy)
+      if round.oral && !OralPractice.isPhone {
+        Text("Åpne Øving på iPhone for å svare muntlig.").foregroundStyle(.secondary)
+      } else if round.available {
+        Button(last == nil ? "Start øving" : "Neste oppgave") { Task {
+          guard !preparing else { return }
+          preparing = true
+          defer { preparing = false }
+          if round.oral {
+            guard await speech.prepare(), model.selectedTab == "exam", scenePhase == .active else { return }
+          }
+          await update("start")
+        } }
+          .buttonStyle(PlayButton()).disabled(busy || preparing)
       } else {
         Text("Ingen nye oppgaver akkurat nå.").foregroundStyle(.secondary)
       }
     }
     Text("\(round.practiced) av \(round.total) oppgaver øvd").font(.footnote).foregroundStyle(.secondary)
-    if round.history.count > 1 {
+    let earlier = Array(round.history.dropFirst()) + round.previous_history
+    if !earlier.isEmpty {
       DisclosureGroup("Tidligere svar") {
-        ForEach(round.history.dropFirst()) { item in
+        ForEach(earlier) { item in
           DisclosureGroup(item.title) { review(item) }.padding(.vertical, 6)
         }
       }
@@ -252,14 +329,19 @@ struct ExamPractice: View {
     do {
       let next: ExamRound
       if let action {
-        var body: [String: Any] = ["action": action, "answer": answer]
+        let oral = round?.oral == true
+        let submitted = oral && action == "submit" && speech.takes.indices.contains(speech.selected)
+          ? speech.takes[speech.selected] : answer
+        var body: [String: Any] = ["action": action, "answer": submitted,
+                                   "input_mode": oral ? "iphone_speech" : "written"]
         if let base = round?.card?.answer { body["base_answer"] = base }
         if let id = previous ?? round?.history.first?.id { body["card_id"] = id }
-        next = try await model.api.send("/exam/pome", body: body)
+        next = try await model.api.send("/exam/practice", body: body)
       } else {
-        next = try await model.api.get("/exam/pome")
+        next = try await model.api.get("/exam/practice")
       }
       guard model.session?.user_id == user else { return }
+      speech.bind(user: user, card: next.oral ? next.card?.id : nil)
       let draft = UserDefaults.standard.dictionary(forKey: draftKey) as? [String: String]
       if let card = next.card {
         if next.conflict {
