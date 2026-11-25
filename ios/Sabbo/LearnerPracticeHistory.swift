@@ -28,7 +28,7 @@ struct LearnerPracticeHistory: View {
           Button("Kunne ikke hente øvingssvar. Prøv igjen") { Task { await load() } }
         }
         if let report {
-          Section("PoMe") {
+          Section("Øving") {
             LabeledContent("Svar i dag", value: String(report.today))
             LabeledContent("Oppgaver øvd", value: "\(report.practiced) av \(report.total)")
             LabeledContent("Ikke prøvd", value: String(report.total - report.practiced))
@@ -67,7 +67,7 @@ struct LearnerPracticeHistory: View {
   @MainActor private func load() async {
     guard model.session?.user_id == ClientProfile.ownerID else { return }
     do {
-      let response: LearnerPracticeReport = try await model.api.get("/exam/pome/learner-history")
+      let response: LearnerPracticeReport = try await model.api.get("/exam/practice/learner-history")
       guard !Task.isCancelled, model.session?.user_id == ClientProfile.ownerID else { return }
       report = response
       failed = false

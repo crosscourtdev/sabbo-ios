@@ -33,6 +33,10 @@
 	<string>public.app-category.education</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Sabbo bruker mikrofonen når du spiller inn et muntlig øvingssvar.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Sabbo gjør talen om til tekst på iPhonen, slik at du kan se gjennom svaret før du leverer.</string>
 	<key>SabboAPIURL</key>
 	<string>$(SABBO_API_URL)</string>
 	<key>UIApplicationSceneManifest</key>

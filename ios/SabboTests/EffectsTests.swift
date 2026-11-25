@@ -4,6 +4,25 @@ import XCTest
 @testable import Sabbo
 
 final class EffectsTests: XCTestCase {
+  @MainActor func testOralTakeSelectionSurvivesReopeningUntilQuestionCloses() {
+    let user = UUID().uuidString
+    let key = "oral-takes-\(user)"
+    defer { UserDefaults.standard.removeObject(forKey: key) }
+    UserDefaults.standard.set(["card": "first", "takes": ["Første svar", "Andre svar"], "selected": 1], forKey: key)
+    let practice = OralPractice()
+    practice.bind(user: user, card: "first")
+    XCTAssertEqual(practice.selected, 1)
+    practice.selected = 0
+    let restored = OralPractice()
+    restored.bind(user: user, card: "first")
+    XCTAssertEqual(restored.takes[restored.selected], "Første svar")
+    restored.bind(user: user, card: nil)
+    XCTAssertTrue(restored.takes.isEmpty)
+    XCTAssertNil(UserDefaults.standard.object(forKey: key))
+    restored.bind(user: user, card: "next")
+    XCTAssertTrue(restored.takes.isEmpty)
+  }
+
   @MainActor func testPracticeLoopsPlayWithReduceMotionEnabled() throws {
     func imageView(in root: UIView) -> PracticeDanceImageView? {
       if let image = root as? PracticeDanceImageView { return image }
