@@ -127,7 +127,7 @@ for scope in ["project", "target"]:
                     "MACOSX_DEPLOYMENT_TARGET": "15.0",
                     "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
                     "CURRENT_PROJECT_VERSION": "1",
-                    "MARKETING_VERSION": "0.5.17",
+                    "MARKETING_VERSION": "0.5.18",
                     "SWIFT_OPTIMIZATION_LEVEL": "-Onone" if mode == "Debug" else "-O",
                     "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "DEBUG"
                     if mode == "Debug"
@@ -340,6 +340,8 @@ info = {
     ],
     "LSApplicationCategoryType": "public.app-category.education",
     "CFBundleURLTypes": [{"CFBundleURLSchemes": [native_config["bundle_id"]]}],
+    "NSMicrophoneUsageDescription": "Sabbo bruker mikrofonen når du spiller inn et muntlig øvingssvar.",
+    "NSSpeechRecognitionUsageDescription": "Sabbo gjør talen om til tekst på iPhonen, slik at du kan se gjennom svaret før du leverer.",
     "SabboAPIURL": "$(SABBO_API_URL)",
     "APNsEnvironment": "$(SABBO_APNS_ENVIRONMENT)",
     "ITSAppUsesNonExemptEncryption": False,
