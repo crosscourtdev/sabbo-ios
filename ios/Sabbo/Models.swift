@@ -31,7 +31,7 @@ struct Question: Codable, Identifiable {
   var key_points: [String]? = nil
   var guidance: String? = nil
 }
-struct QuestionMaterial: Codable { let title: String; let body: String }
+struct QuestionMaterial: Codable { let title: String; let body: String; var attribution: String? = nil }
 struct Attempt: Codable, Identifiable {
   let id: String
   let user_id: String

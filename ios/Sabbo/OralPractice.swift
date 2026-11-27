@@ -10,7 +10,22 @@ final class OralPractice: NSObject, ObservableObject, AVAudioRecorderDelegate {
   @Published private(set) var takes: [String] = []
   @Published var selected = 0 { didSet { persist() } }
   @Published var notice: String?
+  @Published private(set) var pendingFile: String?
+  private var appendIndex: Int?
+  private var folderID = UUID()
+  private var prepared = false
   private var key: String?
+
+  private static func folder(_ id: UUID) -> URL {
+    FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+      .appendingPathComponent("oral-" + id.uuidString, isDirectory: true)
+  }
+
+  func microphoneLevel() -> Double {
+    guard phase == .recording, let recorder else { return 0 }
+    recorder.updateMeters()
+    return min(1, max(0, (Double(recorder.averagePower(forChannel: 0)) + 55) / 55))
+  }
   private var cardID: String?
   private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "nb-NO"))
   private var dictationLocale: Locale?
@@ -29,6 +44,10 @@ final class OralPractice: NSObject, ObservableObject, AVAudioRecorderDelegate {
       notice = "Muntlig øving krever norsk talegjenkjenning på iPhone."
       return false
     }
+    if prepared, SFSpeechRecognizer.authorizationStatus() == .authorized,
+       AVAudioApplication.shared.recordPermission == .granted,
+       dictationLocale != nil || recognizer?.isAvailable == true { return true }
+    prepared = false
     let speech = await withCheckedContinuation { continuation in
       SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0) }
     }
@@ -44,6 +63,7 @@ final class OralPractice: NSObject, ObservableObject, AVAudioRecorderDelegate {
         if let install = try await AssetInventory.assetInstallationRequest(supporting: [module]) {
           try await install.downloadAndInstall()
         }
+        prepared = true
         dictationLocale = locale
         return true
       } catch {
@@ -56,6 +76,7 @@ final class OralPractice: NSObject, ObservableObject, AVAudioRecorderDelegate {
       notice = "Norsk talegjenkjenning er utilgjengelig. Sjekk norsk diktering i Innstillinger og prøv igjen."
       return false
     }
+    prepared = true
     return true
   }
 
@@ -66,9 +87,20 @@ final class OralPractice: NSObject, ObservableObject, AVAudioRecorderDelegate {
     key = userKey
     cardID = card
     let saved = UserDefaults.standard.dictionary(forKey: userKey)
+    let savedFolder = (saved?["folder"] as? String).flatMap(UUID.init(uuidString:))
+    pendingFile = nil
+    appendIndex = nil
     if let card, saved?["card"] as? String == card {
+      folderID = savedFolder ?? UUID()
       takes = saved?["takes"] as? [String] ?? []
+      if let name = saved?["pending"] as? String, UUID(uuidString: name) != nil,
+         FileManager.default.fileExists(atPath: recordingURL(name).path) {
+        pendingFile = name
+        appendIndex = saved?["appendIndex"] as? Int
+      }
     } else {
+      if let savedFolder { try? FileManager.default.removeItem(at: Self.folder(savedFolder)) }
+      folderID = UUID()
       takes = []
       UserDefaults.standard.removeObject(forKey: userKey)
     }
@@ -77,12 +109,20 @@ final class OralPractice: NSObject, ObservableObject, AVAudioRecorderDelegate {
     notice = nil
   }
 
-  private func persist() {
-    guard let key, let cardID, !takes.isEmpty else { return }
-    UserDefaults.standard.set(["card": cardID, "takes": takes, "selected": selected], forKey: key)
+  private func recordingURL(_ name: String) -> URL {
+    Self.folder(folderID).appendingPathComponent(name).appendingPathExtension("caf")
   }
 
-  func record(until deadline: Date) {
+  private func persist() {
+    guard let key, let cardID, !takes.isEmpty || pendingFile != nil else { return }
+    var state: [String: Any] = ["card": cardID, "takes": takes, "selected": selected,
+                                "folder": folderID.uuidString]
+    state["pending"] = pendingFile
+    state["appendIndex"] = appendIndex
+    UserDefaults.standard.set(state, forKey: key)
+  }
+
+  func record(until deadline: Date, continuing: Bool = false) {
     guard phase == .idle, cardID != nil, deadline > Date(), Self.isPhone else { return }
     guard dictationLocale != nil || (recognizer?.isAvailable == true && recognizer?.supportsOnDeviceRecognition == true) else {
       notice = "Norsk talegjenkjenning er utilgjengelig på denne iPhonen."
@@ -94,15 +134,21 @@ final class OralPractice: NSObject, ObservableObject, AVAudioRecorderDelegate {
       playbackConfiguration = (session.category, session.mode, session.categoryOptions)
       try session.setCategory(.record, mode: .measurement)
       try session.setActive(true)
-      let url = FileManager.default.temporaryDirectory.appendingPathComponent("oving-\(UUID()).caf")
+      let name = UUID().uuidString
+      try FileManager.default.createDirectory(at: Self.folder(folderID), withIntermediateDirectories: true)
+      let url = recordingURL(name)
       let capture = try AVAudioRecorder(url: url, settings: [
         AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: 16000,
         AVNumberOfChannelsKey: 1, AVLinearPCMBitDepthKey: 16
       ])
       recorder = capture
       capture.delegate = self
+      capture.isMeteringEnabled = true
       let remaining = deadline.timeIntervalSinceNow
       guard remaining > 0, capture.record(forDuration: remaining) else { throw CaptureError.unavailable }
+      pendingFile = name
+      appendIndex = continuing && takes.indices.contains(selected) ? selected : nil
+      persist()
       phase = .recording
     } catch {
       discardCapture()
@@ -113,39 +159,61 @@ final class OralPractice: NSObject, ObservableObject, AVAudioRecorderDelegate {
   func stop() {
     guard phase == .recording, let capture = recorder else { return }
     capture.stop()
-    finish(capture)
+    finish()
   }
 
   nonisolated func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
     Task { @MainActor in
       guard recorder === self.recorder, self.phase == .recording else { return }
-      if flag { self.finish(recorder) } else { self.stop() }
+      if flag { self.finish() } else { self.stop() }
     }
   }
 
-  private func finish(_ capture: AVAudioRecorder) {
+  private func finish() {
     guard phase == .recording else { return }
-    phase = .transcribing
     recorder = nil
     restorePlayback()
-    let url = capture.url
+    phase = .idle
+    retryTranscription()
+  }
+
+  func retryTranscription() {
+    guard phase == .idle, let pendingFile else { return }
+    phase = .transcribing
+    notice = nil
+    let url = recordingURL(pendingFile)
     transcription = Task {
-      defer { try? FileManager.default.removeItem(at: url) }
       do {
         let file = try AVAudioFile(forReading: url)
         let text = try await transcribe(file)
         try Task.checkCancellation()
-        guard !text.isEmpty else { throw CaptureError.empty }
-        guard text.unicodeScalars.count <= 6000 else { throw CaptureError.tooLong }
-        takes.append(text)
-        selected = takes.count - 1
+        try acceptTranscript(text)
       } catch {
         guard !Task.isCancelled else { return }
-        notice = error as? CaptureError == .tooLong ? "Opptaket er for langt. Prøv et kortere svar." :
-          "Kunne ikke lese opptaket. Prøv igjen hvis du har tid."
+        if error as? CaptureError == .tooLong {
+          notice = "Svaret er for langt. Velg et tidligere svar eller ta et kortere opptak."
+        } else {
+          notice = "Opptaket er lagret. Prøv å gjøre det om til tekst igjen."
+        }
       }
       phase = .idle
       transcription = nil
+    }
+  }
+
+  func acceptTranscript(_ text: String) throws {
+    guard !text.isEmpty else { throw CaptureError.empty }
+    let target = appendIndex.flatMap { takes.indices.contains($0) ? $0 : nil }
+    let answer = target.map { takes[$0] + " " + text } ?? text
+    guard answer.unicodeScalars.count <= 6000 else { throw CaptureError.tooLong }
+    pendingFile = nil
+    appendIndex = nil
+    if let target {
+      takes[target] = answer
+      selected = target
+    } else {
+      takes.append(answer)
+      selected = takes.count - 1
     }
   }
 
@@ -268,7 +336,7 @@ final class OralPractice: NSObject, ObservableObject, AVAudioRecorderDelegate {
     job = nil
     if let recorder {
       recorder.stop()
-      recorder.deleteRecording()
+      if phase != .recording { recorder.deleteRecording() }
     }
     restorePlayback()
     recorder = nil
