@@ -23,6 +23,34 @@ final class EffectsTests: XCTestCase {
     XCTAssertTrue(restored.takes.isEmpty)
   }
 
+  @MainActor func testRecoverInterruptedContinuationAndDeleteAudioAfterClose() throws {
+    let user = UUID().uuidString
+    let folder = UUID()
+    let file = UUID().uuidString
+    let url = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+      .appendingPathComponent("oral-" + folder.uuidString)
+    try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+    try Data([0]).write(to: url.appendingPathComponent(file + ".caf"))
+    let key = "oral-takes-\(user)"
+    defer {
+      try? FileManager.default.removeItem(at: url)
+      UserDefaults.standard.removeObject(forKey: key)
+    }
+    UserDefaults.standard.set(["card": "question", "takes": ["Utgangspunkt.", "Eget opptak."],
+      "folder": folder.uuidString, "pending": file, "selected": 1, "appendIndex": 0], forKey: key)
+    let practice = OralPractice()
+    practice.bind(user: user, card: "question")
+    XCTAssertEqual(practice.pendingFile, file)
+    XCTAssertThrowsError(try practice.acceptTranscript(""))
+    XCTAssertEqual(practice.pendingFile, file)
+    try practice.acceptTranscript("Et nytt poeng.")
+    XCTAssertEqual(practice.takes, ["Utgangspunkt. Et nytt poeng.", "Eget opptak."])
+    XCTAssertEqual(practice.selected, 0)
+    XCTAssertNil(practice.pendingFile)
+    practice.bind(user: user, card: nil)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+  }
+
   @MainActor func testPracticeLoopsPlayWithReduceMotionEnabled() throws {
     func imageView(in root: UIView) -> PracticeDanceImageView? {
       if let image = root as? PracticeDanceImageView { return image }

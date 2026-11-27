@@ -464,6 +464,9 @@ struct QuestionMaterials: View {
           ForEach(Array(StudyPresentation.paragraphs(material.body).enumerated()), id: \.offset) { _, paragraph in
             Text(paragraph).font(.body).fixedSize(horizontal: false, vertical: true).padding(.bottom, 4)
           }
+          if let attribution = material.attribution {
+            Text(attribution).font(.caption).foregroundStyle(.secondary)
+          }
         }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
           .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
       }

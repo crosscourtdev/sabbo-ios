@@ -32,6 +32,27 @@ final class StudyFlowTests: XCTestCase {
 
 
 final class ResultFlowTests: XCTestCase {
+  #if !targetEnvironment(macCatalyst)
+  func testOralMicrophoneStaysVisibleBesideLongExamMaterial() {
+    let app = XCUIApplication()
+    app.launchEnvironment["SABBO_UI_TEST"] = "1"
+    app.launchEnvironment["SABBO_ORAL_LAYOUT_FIXTURE"] = "1"
+    app.launch()
+    app.tabBars.buttons["Øving"].tap()
+    let mic = app.buttons["Ta opp svar"]
+    XCTAssertTrue(mic.waitForExistence(timeout: 6))
+    XCTAssertTrue(mic.isHittable)
+    let originalY = mic.frame.midY
+    app.scrollViews.firstMatch.swipeUp()
+    XCTAssertTrue(mic.isHittable)
+    XCTAssertEqual(mic.frame.midY, originalY, accuracy: 4)
+    XCTAssertFalse(app.buttons["Kopier til talemodus"].exists)
+    XCTAssertFalse(app.buttons["Dette vurderes"].exists)
+    let image = XCTAttachment(screenshot: app.screenshot())
+    image.name = "Oral exam with pinned microphone"; image.lifetime = .keepAlways; add(image)
+  }
+  #endif
+
   func testWritingReportIsOwnerOnlyAndDisclosureIsInSettings() {
     let app = presentation("owner-review", large: true)
     #if targetEnvironment(macCatalyst)

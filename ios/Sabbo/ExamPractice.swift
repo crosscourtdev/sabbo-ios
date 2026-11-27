@@ -12,6 +12,7 @@ private struct ExamRound: Decodable {
     let id, title, prompt, answer, status: String
     let dance_version: Int?
     let result: GradeResult?
+    let review_question: Question?
   }
   struct Milestone: Decodable {
     let id: String
@@ -53,8 +54,8 @@ struct ExamPractice: View {
             practiceSummary(round)
           }
         } else if message == nil { ProgressView() }
-        if preparing { ProgressView("Gjør mikrofonen klar") }
-        if let notice = speech.notice { Text(notice).foregroundStyle(.secondary) }
+        if preparing && round?.card == nil { ProgressView("Gjør mikrofonen klar") }
+        if round?.card == nil, let notice = speech.notice { Text(notice).foregroundStyle(.secondary) }
         if let message {
           Text(message).foregroundStyle(.secondary)
           Button("Oppdater") { Task { await update() } }.disabled(busy)
@@ -62,8 +63,30 @@ struct ExamPractice: View {
       }.padding(20).frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)
     }
       .background(Color(.systemGroupedBackground))
+      .safeAreaInset(edge: .bottom, spacing: 0) {
+        if let round, round.oral, let card = round.card, OralPractice.isPhone {
+          TimelineView(.periodic(from: .now, by: 1)) { tick in
+            oralControls(card, canRecord: tick.date.timeIntervalSince1970 < card.deadline)
+          }
+          .padding(.horizontal, 20).padding(.vertical, 10)
+          .frame(maxWidth: .infinity)
+          .background(.regularMaterial)
+        }
+      }
       .navigationTitle("Øving")
       .toolbar {
+        if let round, round.oral, round.card == nil {
+          ToolbarItem(placement: .primaryAction) {
+            NavigationLink {
+              List {
+                Text("\(round.practiced) av \(round.total) oppgaver øvd").foregroundStyle(.secondary)
+                ForEach(round.history + round.previous_history) { item in
+                  DisclosureGroup(item.title) { review(item) }
+                }
+              }.navigationTitle("Historikk")
+            } label: { Label("Historikk", systemImage: "clock.arrow.circlepath") }
+          }
+        }
         if round?.card != nil && (round?.oral != true || OralPractice.isPhone) {
           ToolbarItem(placement: .primaryAction) {
             Menu {
@@ -104,6 +127,18 @@ struct ExamPractice: View {
         }
       }
       .task {
+        #if DEBUG
+        if model.testing && ProcessInfo.processInfo.environment["SABBO_ORAL_LAYOUT_FIXTURE"] == "1" {
+          let question = Question(id: "oral-layout", version: 1, subject_id: "sample", goal_ids: [],
+            prompt: "Hva er kildene uenige om?",
+            materials: [QuestionMaterial(title: "To utdrag", body: String(repeating: "En kilde begrunner svaret med et eksempel. ", count: 45), attribution: "Eksempelsamlingen")],
+            expectations: ["Vurder argumentene"])
+          round = ExamRound(title: "Muntlig", oral: true,
+            card: .init(id: "layout", question: question, deadline: Date().addingTimeInterval(300).timeIntervalSince1970, answer: ""),
+            history: [], previous_history: [], milestones: [], available: false, conflict: false, practiced: 0, total: 1)
+          return
+        }
+        #endif
         await update()
         var ticks = 0
         while !Task.isCancelled {
@@ -135,17 +170,29 @@ struct ExamPractice: View {
       let seconds = max(0, Int(ceil(card.deadline - timeline.date.timeIntervalSince1970)))
       VStack(alignment: .leading, spacing: 18) {
         HStack(alignment: .firstTextBaseline) {
-          Text(card.question.title ?? "Oppgave").font(.system(.title2, design: .rounded, weight: .bold))
+          if !oral { Text(card.question.title ?? "Oppgave").font(.system(.title2, design: .rounded, weight: .bold)) }
+          else { Text("Muntlig").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary) }
           Spacer(minLength: 12)
           Label(String(format: "%d:%02d", seconds / 60, seconds % 60), systemImage: "timer")
             .font(.headline.monospacedDigit()).fixedSize()
             .accessibilityLabel("Tid igjen: \(seconds) sekunder")
         }
-        QuestionPrompt(question: card.question)
-        QuestionMaterials(question: card.question)
         if oral {
-          oralAnswer(card, seconds: seconds)
+          Text(card.question.displayPrompt).font(.system(.title2, design: .rounded, weight: .semibold))
+            .fixedSize(horizontal: false, vertical: true)
+          QuestionMaterials(question: card.question, showExpectations: false)
+          if !speech.takes.isEmpty {
+            Divider()
+            if speech.takes.count > 1 {
+              Picker("Velg opptak", selection: $speech.selected) {
+                ForEach(speech.takes.indices, id: \.self) { i in Text("Opptak \(i + 1)").tag(i) }
+              }.disabled(speech.phase != .idle || busy || preparing)
+            } else { Text("Ditt svar").font(.headline) }
+            Text(speech.takes[speech.selected]).frame(maxWidth: .infinity, alignment: .leading)
+          }
         } else {
+          QuestionPrompt(question: card.question)
+          QuestionMaterials(question: card.question)
           AnswerEditor(text: Binding(get: { answer }, set: {
             answer = String($0.prefix(6000))
             UserDefaults.standard.set(["id": card.id, "base": card.answer, "answer": answer], forKey: draftKey)
@@ -159,42 +206,66 @@ struct ExamPractice: View {
     }
   }
 
-  @ViewBuilder private func oralAnswer(_ card: ExamRound.Card, seconds: Int) -> some View {
-    switch speech.phase {
-    case .recording:
-      Button { speech.stop() } label: { Label("Stopp", systemImage: "stop.circle.fill") }
-        .buttonStyle(PlayButton())
-    case .transcribing:
-      ProgressView("Gjør om tale til tekst")
-    case .idle:
-      if !speech.takes.isEmpty {
-        if speech.takes.count > 1 {
-          Picker("Velg opptak", selection: $speech.selected) {
-            ForEach(speech.takes.indices, id: \.self) { i in Text("Opptak \(i + 1)").tag(i) }
+  private func oralControls(_ card: ExamRound.Card, canRecord: Bool) -> some View {
+    VStack(spacing: 8) {
+      if let notice = speech.notice { Text(notice).font(.footnote).foregroundStyle(.secondary) }
+      switch speech.phase {
+      case .recording:
+        Button { speech.stop() } label: {
+          HStack(spacing: 10) {
+            Label("Stopp opptak", systemImage: "stop.fill")
+            TimelineView(.periodic(from: .now, by: 0.12)) { _ in
+              let level = speech.microphoneLevel()
+              HStack(alignment: .bottom, spacing: 3) {
+                ForEach(0..<6) { i in
+                  Capsule().fill(SabboStyle.forest.opacity(Double(i) < level * 6 ? 1 : 0.20))
+                    .frame(width: 3, height: CGFloat(5 + i * 2))
+                }
+              }
+            }.accessibilityHidden(true)
+          }
+        }.buttonStyle(PlayButton())
+      case .transcribing:
+        ProgressView("Gjør om tale til tekst").frame(minHeight: 52)
+      case .idle:
+        if preparing {
+          ProgressView("Gjør mikrofonen klar").frame(minHeight: 52)
+        } else {
+          if speech.pendingFile != nil {
+            Button("Prøv transkribering på nytt") { beginCapture(card, retry: true) }
+              .buttonStyle(.bordered).disabled(busy)
+          }
+          if !speech.takes.isEmpty {
+            Button("Lever svar") { Task { await update("submit") } }
+              .buttonStyle(PlayButton()).disabled(busy)
+            if canRecord {
+              HStack(spacing: 20) {
+                Button("Fortsett svaret") { beginCapture(card, continuing: true) }
+                Button("Ta på nytt") { beginCapture(card) }
+              }.font(.subheadline.weight(.semibold)).frame(minHeight: 44).disabled(busy)
+            }
+          } else if canRecord {
+            Button { beginCapture(card) } label: {
+              Label(speech.pendingFile == nil ? "Ta opp svar" : "Ta på nytt", systemImage: "mic.fill")
+            }.buttonStyle(PlayButton()).disabled(busy)
+          } else {
+            if speech.pendingFile == nil { Text("Tiden er ute. Ingen opptak å levere.").font(.subheadline) }
+            Button("Avslutt oppgaven") { confirmSkip = true }
           }
         }
-        Text(speech.takes[speech.selected])
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .accessibilityLabel("Transkripsjon. \(speech.takes[speech.selected])")
-        Button("Lever svar") { Task { await update("submit") } }
-          .buttonStyle(PlayButton()).disabled(busy)
       }
-      if seconds > 0 {
-        Button {
-          Task {
-            guard !preparing else { return }
-            preparing = true
-            defer { preparing = false }
-            guard await speech.prepare(), round?.card?.id == card.id, scenePhase == .active,
-                  model.selectedTab == "exam" else { return }
-            speech.record(until: Date(timeIntervalSince1970: card.deadline))
-          }
-        } label: { Label(speech.takes.isEmpty ? "Ta opp svar" : "Prøv igjen", systemImage: "mic.fill") }
-          .disabled(busy || preparing)
-      } else if speech.takes.isEmpty {
-        Text("Tiden er ute. Ingen opptak å levere.").foregroundStyle(.secondary)
-        Button("Avslutt oppgaven") { confirmSkip = true }
-      }
+    }.frame(maxWidth: 640)
+  }
+
+  private func beginCapture(_ card: ExamRound.Card, continuing: Bool = false, retry: Bool = false) {
+    guard !preparing, !busy else { return }
+    preparing = true
+    Task {
+      defer { preparing = false }
+      guard await speech.prepare(), round?.card?.id == card.id, scenePhase == .active,
+            model.selectedTab == "exam" else { return }
+      if retry { speech.retryTranscription() }
+      else { speech.record(until: Date(timeIntervalSince1970: card.deadline), continuing: continuing) }
     }
   }
 
@@ -212,41 +283,44 @@ struct ExamPractice: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
       }
-      VStack(alignment: .leading, spacing: 12) {
-        VStack(alignment: .leading, spacing: 4) {
-          Text(round.oral ? "Religion" : "PoMe").font(.subheadline.weight(.semibold)).foregroundStyle(Color.accentColor)
-          Text(last.title).font(.system(.title2, design: .rounded, weight: .bold))
-        }
-
-        if let grade = last.result?.grade {
-          VStack(alignment: .leading, spacing: 2) {
-            Text("Karakter").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
-            Text(String(grade)).font(.system(.largeTitle, design: .rounded, weight: .bold))
+      if !round.oral || !pending {
+        VStack(alignment: .leading, spacing: 12) {
+          if !round.oral {
+            VStack(alignment: .leading, spacing: 4) {
+              Text("PoMe").font(.subheadline.weight(.semibold)).foregroundStyle(Color.accentColor)
+              Text(last.title).font(.system(.title2, design: .rounded, weight: .bold))
+            }
           }
-          .accessibilityElement(children: .combine)
-          Divider()
-        }
+          if let grade = last.result?.grade {
+            VStack(alignment: .leading, spacing: 2) {
+              Text("Karakter").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+              Text(String(grade)).font(.system(.largeTitle, design: .rounded, weight: .bold))
+            }
+            .accessibilityElement(children: .combine)
+            Divider()
+          }
 
-        if let result = last.result {
-          Text(result.improvement.isEmpty ? result.reason : result.improvement)
-          if result.grade != nil { streakProgress(round) }
-        } else if failed {
-          Button("Prøv vurderingen igjen") { Task { await update("retry") } }
-            .buttonStyle(PlayButton()).disabled(busy)
-        } else if !pending {
-          Text(statusText(last)).font(.headline)
+          if let result = last.result {
+            Text(result.improvement.isEmpty ? result.reason : result.improvement)
+            if !round.oral && result.grade != nil { streakProgress(round) }
+          } else if failed {
+            Button("Prøv vurderingen igjen") { Task { await update("retry") } }
+              .buttonStyle(PlayButton()).disabled(busy)
+          } else if !pending {
+            Text(statusText(last)).font(.headline)
+          }
+          DisclosureGroup(round.oral ? "Se vurdering" : "Se gjennom svaret") { review(last, waiting: pending) }.id(last.id)
         }
-        DisclosureGroup("Se gjennom svaret") { review(last, waiting: pending) }.id(last.id)
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22))
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: pending)
       }
-      .padding(18)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22))
-      .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: pending)
     } else {
-      Text(round.title).font(.system(.title2, design: .rounded, weight: .bold))
-      Text("Fem minutter per oppgave. Oppgaver du strever med kommer tilbake oftere.")
+      Text(round.oral ? "Religion · muntlig" : round.title).font(.system(.title2, design: .rounded, weight: .bold))
+      Text(round.oral ? "5 minutter per oppgave" : "Fem minutter per oppgave. Oppgaver du strever med kommer tilbake oftere.")
         .foregroundStyle(.secondary)
-      streakProgress(round)
+      if !round.oral { streakProgress(round) }
     }
     if !pending && !failed {
       if round.oral && !OralPractice.isPhone {
@@ -266,12 +340,14 @@ struct ExamPractice: View {
         Text("Ingen nye oppgaver akkurat nå.").foregroundStyle(.secondary)
       }
     }
-    Text("\(round.practiced) av \(round.total) oppgaver øvd").font(.footnote).foregroundStyle(.secondary)
-    let earlier = Array(round.history.dropFirst()) + round.previous_history
-    if !earlier.isEmpty {
-      DisclosureGroup("Tidligere svar") {
-        ForEach(earlier) { item in
-          DisclosureGroup(item.title) { review(item) }.padding(.vertical, 6)
+    if !round.oral {
+      Text("\(round.practiced) av \(round.total) oppgaver øvd").font(.footnote).foregroundStyle(.secondary)
+      let earlier = Array(round.history.dropFirst()) + round.previous_history
+      if !earlier.isEmpty {
+        DisclosureGroup("Tidligere svar") {
+          ForEach(earlier) { item in
+            DisclosureGroup(item.title) { review(item) }.padding(.vertical, 6)
+          }
         }
       }
     }
@@ -314,7 +390,17 @@ struct ExamPractice: View {
       Text(item.answer.isEmpty ? "Ingen tekst levert." : item.answer)
       if let result = item.result {
         if let grade = result.grade { Text("Karakter \(grade)").font(.headline) }
-        AssessmentSummary(result: result, showsCriteria: true)
+        if let question = item.review_question {
+          Text(result.reason)
+          if let criteria = question.rubric?.criteria {
+            ForEach(criteria, id: \.id) { criterion in
+              if let graded = result.criteria.first(where: { $0.id == criterion.id }) {
+                CriterionFeedback(criterion: graded, part: question)
+              } else { Text(criterion.expectation).font(.subheadline) }
+            }
+          }
+          SourceLinks(question: question)
+        } else { AssessmentSummary(result: result, showsCriteria: true) }
       } else if !waiting { Text(statusText(item)).foregroundStyle(.secondary) }
     }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 12)
   }
